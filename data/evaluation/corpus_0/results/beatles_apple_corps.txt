@@ -1,0 +1,36 @@
+Beatles Apple corps
+0	XXXX-XX-XX	17677-13-asked
+0	XXXX-XX-XX	4596-3-claims
+0	XXXX-XX-XX	4596-5-made
+0	XXXX-XX-XX	17174-7-praised
+0	XXXX-XX-XX	17654-19-reveal
+0	XXXX-XX-XX	18315-4-said
+0	XXXX-XX-XX	7724-5-said
+0	XXXX-XX-XX	18315-19-serve
+0	XXXX-XX-XX	4954-6-showed
+0	XXXX-XX-XX	7539-11-sold
+0	XXXX-XX-XX	4596-6-sued
+0	XXXX-XX-XX	7343-7-taking_out
+1	1968	4596-16-founded
+2	1984	18355-6-started
+3	1989	4596-8-file
+3	1989	4596-8-suit
+4	2006-03-28	4596-2-filed
+4	2006-03-28	4596-2-lawsuit	4596-2-lawsuit
+5	2006-05-08	4954-3-argued
+5	2006-05-08	4954-2-court_case
+5	2006-05-08	4954-2-lost
+6	2007-01-10	7343-8-speech
+6	2007-01-10	7343-8-stated
+7	2007-02-06	7724-2-dispute
+8	2008-03-06	11212-2-released
+9	2008-04-03	11778-2-launch
+10	2008-06-09	12315-3-announced
+10	2008-06-09	12315-2-launched
+11	2010-06-08	16844-11-uses
+12	2010-10-23	16983-7-said
+13	2011-01-17	17677-11-leave
+14	2011-08-25	18315-4-resigned
+15	2011-10-05	18355-2-died
+15	2011-10-05	18355-9-reassumed
+16	2011-10-06	18355-12-lost	18355-12-lost

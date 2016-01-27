@@ -1,0 +1,7 @@
+iPod
+0	XXXX-XX-XX	4596-5-owns
+0	XXXX-XX-XX	4678-5-use
+1	2006-04-05	4678-2-produced
+1	2006-04-05	4678-3-works
+2	2006-12-25	7539-3-demand
+3	2007-09-05	9509-13-described

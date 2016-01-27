@@ -1,0 +1,8 @@
+iPod
+0	XXXX-XX-XX	7539-14-sales
+0	XXXX-XX-XX	4596-5-made
+0	XXXX-XX-XX	4596-5-marketed
+0	XXXX-XX-XX	4678-9-sold
+1	2006-01	4678-5-use
+2	2006-01-01	7539-11-sold
+3	2006-03-28	4596-5-owns

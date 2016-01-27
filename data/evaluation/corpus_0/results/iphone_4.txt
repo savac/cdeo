@@ -1,0 +1,14 @@
+iPhone 4
+0	XXXX-XX-XX	16844-21-comes
+0	XXXX-XX-XX	17174-14-decision
+0	XXXX-XX-XX	17174-14-development
+0	XXXX-XX-XX	16844-8-has	16844-9-has	16844-11-has
+0	XXXX-XX-XX	16844-5-introducing
+0	XXXX-XX-XX	17174-14-proceed
+0	XXXX-XX-XX	16844-7-reduction
+0	XXXX-XX-XX	16844-16-use
+1	2003-02	11778-3-launch
+2	2010-06-07	16844-2-unveiled
+3	2010-06-15	16900-2-announced
+4	2010-06-24	17036-15-dropped
+4	2010-06-24	16900-11-introduced

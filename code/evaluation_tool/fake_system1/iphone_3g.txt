@@ -1,0 +1,4 @@
+iPhone 3G
+1	2008-06-09	12315-2-launched	12315-3-launching
+1	2008-06-09	12315-3-promoted
+2	2010-06-24	16844-23-discontinued

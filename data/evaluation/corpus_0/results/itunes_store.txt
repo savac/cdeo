@@ -1,0 +1,16 @@
+iTunes store
+0	XXXX-XX-XX	4954-5-branded
+0	XXXX-XX-XX	11778-6-held
+0	XXXX-XX-XX	10718-6-launch
+0	XXXX-XX-XX	11778-4-passes
+0	XXXX-XX-XX	4954-5-sells	4596-11-sells
+0	XXXX-XX-XX	17654-25-unveiling
+1	1991	4954-3-breach
+2	2003	4596-17-launched
+3	2003-04-28	10718-4-launched
+3	2003-04-28	10718-6-sold
+4	2006	10718-5-renamed
+5	2006-03-29	4596-5-marketed
+6	2006-06-20	5504-3-sells	5504-3-sell
+7	2008-02	11778-2-passed
+8	2008-04-03	11778-3-accounts_for

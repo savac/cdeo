@@ -1,0 +1,91 @@
+Steve Jobs
+0	XXXX-XX-XX	17036-11-acknowledged
+0	XXXX-XX-XX	1664-13-announced
+0	XXXX-XX-XX	1664-14-announced
+0	XXXX-XX-XX	1664-15-announced
+0	XXXX-XX-XX	1664-17-announced
+0	XXXX-XX-XX	1664-18-announced
+0	XXXX-XX-XX	17036-16-attributed
+0	XXXX-XX-XX	1664-10-called	1664-11-called	16844-18-called
+0	XXXX-XX-XX	18355-16-death
+0	XXXX-XX-XX	17677-6-decision
+0	XXXX-XX-XX	16844-10-demoed	1664-16-demoed
+0	XXXX-XX-XX	11212-15-described
+0	XXXX-XX-XX	18355-18-described
+0	XXXX-XX-XX	18315-10-farewell
+0	XXXX-XX-XX	18355-16-had	18355-16-had
+0	XXXX-XX-XX	16844-5-hinting
+0	XXXX-XX-XX	17174-7-introduced
+0	XXXX-XX-XX	17677-12-involved
+0	XXXX-XX-XX	18355-13-know
+0	XXXX-XX-XX	12315-3-launching	12315-3-launching
+0	XXXX-XX-XX	18315-11-leave	18355-14-leaves
+0	XXXX-XX-XX	16844-6-praised
+0	XXXX-XX-XX	18315-11-recommended
+0	XXXX-XX-XX	18315-10-resignation
+0	XXXX-XX-XX	17654-19-returned
+0	XXXX-XX-XX	17654-25-rounded_off
+0	XXXX-XX-XX	17036-10-said
+0	XXXX-XX-XX	17174-11-said
+0	XXXX-XX-XX	17036-17-said
+0	XXXX-XX-XX	1664-21-said
+0	XXXX-XX-XX	17654-27-said
+0	XXXX-XX-XX	16983-4-saying	16844-5-saying	17036-11-saying
+0	XXXX-XX-XX	16844-12-showed_off
+0	XXXX-XX-XX	18315-18-steer
+0	XXXX-XX-XX	1664-22-talked
+0	XXXX-XX-XX	17677-5-undergone
+0	XXXX-XX-XX	18315-15-underwent
+0	XXXX-XX-XX	16983-4-unveiled
+0	XXXX-XX-XX	1664-4-welcomed
+1	1955-02-24	18355-5-born
+2	2004	18315-7-fighting
+2	2004	17677-5-fought
+3	2005-06	1664-7-said
+4	2005-06-06	1664-3-announced
+4	2005-06-06	1664-4-announced
+4	2005-06-06	1664-2-keynote
+4	2005-06-06	1664-24-said
+4	2005-06-06	1664-9-talk
+5	2006	1664-20-said
+6	2006-05-08	4954-8-invitation
+7	2007-01-10	7343-7-unveiled
+7	2007-01-10	7343-7-walking
+8	2007-09-05	9509-12-announced
+9	2008-06-09	12315-3-promoted
+9	2008-06-09	12315-3-saying
+10	2009	16983-20-said
+11	2010	18315-8-this
+12	2010-06-08	16844-29-noted
+13	2010-06-24	17036-15-admitted
+13	2010-06-24	17036-15-dropped
+14	2010-07-16	17036-11-dismissed
+14	2010-07-16	17036-11-issue
+14	2010-07-16	17036-6-said
+14	2010-07-16	17036-9-said
+15	2010-10-20	16983-10-address
+15	2010-10-20	16983-8-announced
+15	2010-10-20	16983-10-announced
+16	2010-10-23	16983-6-announced
+16	2010-10-23	16983-14-announced
+16	2010-10-23	16983-17-said
+17	2011-01-17	17677-7-absences
+17	2011-01-17	17677-2-announced
+17	2011-01-17	17677-11-granted
+17	2011-01-17	17677-2-leave	17677-4-leave
+17	2011-01-17	17677-7-left
+17	2011-01-17	17677-11-request
+17	2011-01-17	17677-5-revealing
+17	2011-01-17	17677-6-said
+18	2011-03	18315-9-appearance
+18	2011-03	18315-8-leave
+19	2011-06	18315-9-unveil
+20	2011-06-07	17654-5-announced
+20	2011-06-07	17654-2-introduced
+21	2011-08-24	18355-3-resigned
+22	2011-08-25	18315-6-stated
+22	2011-08-25	18315-2-step_down
+22	2011-08-25	18315-3-succeeding
+23	2011-10-05	18355-5-built
+23	2011-10-05	18355-9-returned
+24	2011-10-06	18355-13-lost

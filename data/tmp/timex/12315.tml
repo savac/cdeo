@@ -1,0 +1,5 @@
+<TimeML>
+<DOCID>temp_doc</DOCID>
+<DCT><TIMEX3 tid="t0" type="DATE" value="2008-06-09" functionInDocument="CREATION_TIME">2008-06-09</TIMEX3></DCT>
+<TEXT>Apple launches 3G iPhone <TIMEX3 tid="t1" type="DATE" value="2008-06-09">June 9 , 2008</TIMEX3> Apple Computer <TIMEX3 tid="t2" type="DATE" value="2008-06-09">today</TIMEX3> launched a 3G version of its iPhone device . Steve Jobs , the Apple Chief Executive Officer , announced the development at a developers ' conference , where he promoted the iPhone by saying that , " just <TIMEX3 tid="t3" type="DURATION" value="P1Y">one year</TIMEX3> after launching the iPhone , we ' re launching the new iPhone 3G that is twice as fast at half the price . " Apple has claimed that the 3G iPhone will provide internet access at double the speed of the internet access provided by the previous versions . The price for the iPhone has also been reduced to $ 199 in the US , with prices in other countries equal or below that of within the US . For <TIMEX3 tid="t4" type="DURATION" value="PXM">several months</TIMEX3> there has been speculation among Apple fans about the launch of a 3G iPhone . </TEXT>
+</TimeML>
