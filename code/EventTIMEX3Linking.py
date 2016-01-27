@@ -8,6 +8,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 import itertools
 import nltk.stem.porter as porter
+from viterbi import hmmClass
+from viterbi import Viterbi
 reload(utils)
 
 def linkEventTIMEX3(doc, eventMIdList):
@@ -348,6 +350,7 @@ def structuredPredictionTraining(collection_train_list, syntactic_features):
         
     trainError = list()
     wanted_type = ['DATE','TIME']
+    print "Training Event to TIMEX linking model ..."
     for i in range(0,15): # number of iterations
         print 'Structured Perceptron Iteration: ', i
         lrate = 0.8*lrate
@@ -405,22 +408,17 @@ def structuredPredictionTraining(collection_train_list, syntactic_features):
                             for t1 in allTimex:
                                 global_feat_dict[((prev_event, t0),(event, t1))] = getGlobalFeatures(doc, (prev_event, t0), (event, t1))
                     
-                            
-                    #print len(linkedEvents), len(allTimex)
-                    #print 'Local feat dict:', len(local_feat_dict), 'Events and times: ', len(linkedEvents), len(allTimex)
-                    
                     if len(linkedEvents) and len(allTimex): # and len(allTimex) < 4:
                         (linkedTimex_pred, pred) = argmaxEventTIMEX(doc, linkedEvents, allTimex, w, local_feat_dict, global_feat_dict)
                                                 
                         if not tuple(linkedTimex) == linkedTimex_pred:
                             w = w + (getPHI(doc, linkedEvents, linkedTimex, local_feat_dict, global_feat_dict) - getPHI(doc, linkedEvents, linkedTimex_pred, local_feat_dict, global_feat_dict))
-                            #wa = wa + c * (getPHI(doc, linkedEvents, linkedTimex, local_feat_dict, global_feat_dict) - getPHI(doc, linkedEvents, linkedTimex_pred, local_feat_dict, global_feat_dict))
                         wa = wa + w
                         c += 1
-    return wa/c # w - wa/c
+    return wa/c
 
 def getPHI(doc, listEvents, listTimex, local_feat_dict, global_feat_dict):
-    PHI = np.zeros(500) # TBD: zise
+    PHI = np.zeros(500)
     
     # local features
     for event, timex in zip(listEvents, listTimex):
@@ -461,7 +459,6 @@ def structuredPrediction(w, doc, listEvents, syntactic_features):
             for t1 in timexList:
                 global_feat_dict[((prev_event, t0),(event, t1))] = getGlobalFeatures(doc, (prev_event, t0), (event, t1))
     
-    #(best_timex, predicted_prob) = argmaxEventTIMEX(doc, event, timexList, w, syntactic_features)
     (best_seq, best_pred) = argmaxEventTIMEX(doc, listEvents, timexList, w, local_feat_dict, global_feat_dict)
 
     return best_seq
@@ -494,64 +491,6 @@ def argmaxEventTIMEX(doc, linkedEvents, allTimex, w, local_feat_dict, global_fea
     best_seq = thisViterbi.return_max()
     
     return (best_seq, 0)
-
-class hmmClass(object):
-    def __init__(self,labels, tProb, eProb, tw, ew):
-        self.labels = labels
-        self.tProb=tProb
-        self.eProb=eProb
-        self.tw=tw
-        self.ew=ew
-
-class Viterbi:
-    trell = []
-    def __init__(self, hmm, words):
-        self.trell = []
-        temp = {}
-        for label in hmm.labels:
-           temp[label] = [0,None]
-        for word in words:
-            self.trell.append([word,copy.deepcopy(temp)])
-        self.fill_in(hmm)
-
-    def fill_in(self,hmm):
-        for i in range(len(self.trell)):
-            for token in self.trell[i][1]:
-                word = self.trell[i][0]
-                if i == 0:
-                    self.trell[i][1][token][0] = np.dot(hmm.eProb[(word, token)], hmm.ew)
-                else:
-                    max = None
-                    guess = None
-                    c = None
-                    prev_word = self.trell[i-1][0]
-                    for k in self.trell[i-1][1]:
-                        c = self.trell[i-1][1][k][0] + np.dot(hmm.tProb[((prev_word, k), (word, token))], hmm.tw)
-                        if max == None or c > max:
-                            max = c
-                            guess = k
-                    max += np.dot(hmm.eProb[(word, token)], hmm.ew)
-                    self.trell[i][1][token][0] = max
-                    self.trell[i][1][token][1] = guess
-
-    def return_max(self):
-        tokens = []
-        token = None
-        for i in range(len(self.trell)-1,-1,-1):
-            if token == None:
-                max = None
-                guess = None
-                for k in self.trell[i][1]:
-                    if max == None or self.trell[i][1][k][0] > max:
-                        max = self.trell[i][1][k][0]
-                        token = self.trell[i][1][k][1]
-                        guess = k
-                tokens.append(guess)
-            else:
-                tokens.append(token)
-                token = self.trell[i][1][token][1]
-        tokens.reverse()
-        return tokens
 
 def getGlobalFeatures(doc, t0, t1):
     '''t0 and t1 are adjacent hidden variables in a HMM representing a (event, timex) tuple.'''

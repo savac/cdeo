@@ -41,7 +41,6 @@ def getCollection(ncorpus):
     collection0 = []
     
     for indoc in collection:
-        #h = startUWTimeServer()
         print indoc.get_doc_id()
 
         doc = TimestampExtraction.getTimestamps(indoc) # NB: doc 120578 has a mistake in the DCT annotation. The CAT files has been corrected by hand.
@@ -55,10 +54,6 @@ def getCollection(ncorpus):
         newList = [doc.Markables.EVENT_MENTION[i] for i in indSorted]
         doc.Markables.EVENT_MENTION = newList
         
-        #for event in doc.Markables.EVENT_MENTION:
-        #        print event.get_token_anchor()[0].t_id, utils.getToken(doc, event.get_token_anchor()[0].t_id).sentence, utils.getEventTextFull(doc, event)
-        
-        #h.kill()
         collection0.append(doc)
         
     collection = collection0
@@ -142,9 +137,6 @@ def evaluateEventTIMEX3Linking(timeline, corpus, collection):
             totalList.append((docId, event_sentence, str_event, date_str))
     try:
         tmpGoldList = [(x[0], x[1], x[2], x[4]) for x in goldList] # keep timex and event
-        
-        #print tmpGoldList, totalList
-        
         precision = float(len(set(totalList).intersection(tmpGoldList)))/len(totalList) * 100
         recall = float(len(set(totalList).intersection(tmpGoldList)))/len(goldList) * 100
         f1 = 2 * precision * recall / (precision + recall)
@@ -185,9 +177,6 @@ def run(corpus = 1, train_corpus_list = [0, 1]):
 
     w_ee = EventEntityLinking.structuredPredictionTraining(collection_train_list, entity_syntactic_features)   
     w = EventTIMEX3Linking.structuredPredictionTraining(collection_train_list, timex_syntactic_features)
-
-    #print entity_syntactic_features, timex_syntactic_features
-    #return
 
     # Test
     (collection, targetEntityList) = getCollection(corpus)
@@ -242,52 +231,38 @@ def run(corpus = 1, train_corpus_list = [0, 1]):
     timeline = Ordering.order(collection, timeline)
     
     # printing and saving to file
-    #try:
     for targetEntity in timeline.keys():
         fname = targetEntity.lower()
         fname = fname.replace('&', '_and_')
         fname = resDir + re.sub('[^0-9a-z]+', '_', fname) + '.txt'
-        #fname = resDir + fname.replace(' ', '_') + '.txt'
         f = open(fname, 'w')
         f.write(targetEntity)    
         
         last_eventClusterId = -1
-        #last_stem = ''
         for lst in timeline[targetEntity]:
             [doc_id, event_m_id, timex3_m_id, this_date, order, nsentence, str_event, this_stem, eventClusterId] = lst
 
             doc = utils.getDoc(collection, doc_id)
             
             date_str = utils.getTIMEX3Stamp(doc, timex3_m_id)
-            # Debug stuff: check the timex trigger
-            #t = utils.getTIMEX3(doc, timex3_m_id)
-            #str_timex = ''
-            #for a in t.get_token_anchor():
-            #    str_timex += doc.token[a.t_id-1].get_valueOf_() + ' ' # TBD: better to look for tokens searching by t_id.
-
 
             # docid-sentence, event, timex3, timex3 text
             if eventClusterId == last_eventClusterId: # TBD: this is flaky as we only check events adjacent in timeline
-            #if last_stem == this_stem:
                 f.write('\t' + str(doc.doc_id) + '-' + str(nsentence)+ '-' + str_event) #+  "\t('" + str_timex + "')" 
             else:
                 f.write('\n' + str(order) + '\t' + date_str + '\t' + str(doc_id) + '-' + str(nsentence)+ '-' + str_event) #+  "\t('" + str_timex + "')" 
             last_eventClusterId = eventClusterId
             last_stem = this_stem
         f.close()
-    #except:
-    #    print 'Error in saving results to file'
+
+    evaluateEventEntityLinking(timeline, corpus, collection)
+    evaluateEventTIMEX3Linking(timeline, corpus, collection)
 
     try:
+        print "\n\nEnd to end evaluation"
         os.chdir('evaluation_tool')
         os.system(('python evaluation_all.py ../../data/evaluation/corpus_%d/TimeLines_Gold_Standard/ ../../data/evaluation/corpus_%d/results/' %(corpus,corpus)))
         #os.system(('python evaluation_all.py --ord ../../evaluation/corpus_%d/TimeLines_Gold_Standard/ ../../evaluation/corpus_%d/results/' %(corpus,corpus)))
         os.chdir('..')
     except:
         print 'Evaluation error'
-
-    evaluateEventEntityLinking(timeline, corpus, collection)
-    evaluateEventTIMEX3Linking(timeline, corpus, collection)
-    #print clfEntity.coef_
-    #print clfTIMEX3.coef_
-

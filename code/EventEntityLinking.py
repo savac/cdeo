@@ -8,25 +8,10 @@ import copy
 import cdeo_config
 import itertools
 import nltk.stem.porter as porter
+from viterbi import hmmClass
+from viterbi import Viterbi
 reload(utils)
 
-'''
-def linkEventEntity(doc, targetEntityText):
-    # Do something simple. Link event and entity if they are in the same sentence.
-    res = list()
-    for en in doc.Markables.ENTITY_MENTION:
-        if en.get_type() == targetEntityText:
-            entity_t_id = en.get_token_anchor()[0].t_id
-            entity_sentence = utils.getToken(doc, entity_t_id).sentence
-            for ev in doc.Markables.EVENT_MENTION:
-                event_t_id = ev.get_token_anchor()[0].t_id
-                event_sentence = utils.getToken(doc, event_t_id).sentence
-                if entity_sentence == event_sentence:
-                    if res.count(ev.m_id) == 0:
-                        res.append(ev.m_id)
-
-    return res
-'''
 def linkEventEntityRuleBased(doc, targetEntityText):
     ''' Loop over events and pair <targetEntityText> entity if it is the closest entity in the same (or nearest 2) sentence'''
     res = list()
@@ -78,16 +63,7 @@ def trainEventEntityClassifier(collection_train_list, syntactic_features):
         (collection, targetEntityList) = tup
         for doc in collection:
             for event in doc.Markables.EVENT_MENTION:
-                '''
-                # NB: we need to balance the classes, so we use one class '1' and one class '0'
-                class_0_list = copy.deepcopy(targetEntityList)
-                try:
-                    class_0_list.remove(event.get_linkedEntityName())
-                except ValueError:
-                    print class_0_list, event.get_linkedEntityName(), utils.getEventText(doc, event), event.m_id, doc.get_doc_id()
-                    continue
-                wanted_list = [event.get_linkedEntityName(), class_0_list[random.randint(0,len(class_0_list)-1)]]
-                '''
+
                 wanted_list = targetEntityList
                 for targetEntity in wanted_list:
                     thisEntityFeatureList = getLinkFeatures(doc, event, targetEntity, syntactic_features)
@@ -279,6 +255,7 @@ def structuredPredictionTraining(collection_train_list, syntactic_features):
         
     trainError = list()
     wanted_type = ['DATE','TIME']
+    print "Training Event to Entity linking model ..."
     for i in range(15): # number of iterations
         print 'Structured Perceptron Iteration: ', i
         lrate = 0.9*lrate
@@ -288,11 +265,6 @@ def structuredPredictionTraining(collection_train_list, syntactic_features):
             (collection, targetEntityList) = tup
             #random.shuffle(collection)
             for doc in collection:
-                
-                # get a list of all target entities
-                #allEntities = [None] # allow for a possibility of not matching with an actual timex 
-                #for e in doc.Markables.ENTITY_MENTION:
-                #    allEntities.append(e.m_id)
 
                 # get lists of linked events and entities
                 linkedEvents = list()
@@ -306,8 +278,6 @@ def structuredPredictionTraining(collection_train_list, syntactic_features):
                     else:
                         linkedEvents.append(event)
                         linkedEntities.append(goldEntity)
-                        
-                        
 
                 # for each document we have:
                 # - a list of events in linkedEvents
@@ -336,13 +306,12 @@ def structuredPredictionTraining(collection_train_list, syntactic_features):
                                             
                     if not tuple(linkedEntities) == linkedEntities_pred:
                         w = w + (getPHI(doc, linkedEvents, linkedEntities, local_feat_dict, global_feat_dict) - getPHI(doc, linkedEvents, linkedEntities_pred, local_feat_dict, global_feat_dict))
-                        #wa = wa + c * (getPHI(doc, linkedEvents, linkedTimex, local_feat_dict, global_feat_dict) - getPHI(doc, linkedEvents, linkedTimex_pred, local_feat_dict, global_feat_dict))
                     wa = wa + w
                     c += 1
-    return wa/c # w - wa/c
+    return wa/c
 
 def getPHI(doc, listEvents, listTimex, local_feat_dict, global_feat_dict):
-    PHI = np.zeros(500) # TBD: zise
+    PHI = np.zeros(500)
     
     # local features
     for event, timex in zip(listEvents, listTimex):
@@ -360,8 +329,8 @@ def getPHI(doc, listEvents, listTimex, local_feat_dict, global_feat_dict):
     return np.append(PHI, PHI2)
 
 def structuredPrediction(w, doc, listEvents, targetEntityList, syntactic_features):
-    '''Given the weights from the structured perceptron predict the TIMEX3 associated with the Event'''
-    # NB!!!! Are we assuming that the events are ordered? Does it matter?
+    '''Given the weights from the structured perceptron predict the target entity associated with the Event'''
+    # NB: Note that we ordered the events when we read in the corpus.
             
     # precompute features
     local_feat_dict = dict()
@@ -400,22 +369,6 @@ def linkEventEntitySP(w, doc, targetEntityList, syntactic_features):
         
     return res
 
-'''
-def linkEventEntityML(clf, doc, targetEntityList, syntactic_features):
-    # prep dictionary
-    res = dict()
-    for targetEntity in targetEntityList:
-        res[targetEntity] = []
-        
-    # loop over events and predict for each event
-    for event in doc.Markables.EVENT_MENTION:
-        predictedEntityList = predictEventEntityLink(clf, doc, event, targetEntityList, syntactic_features)
-        for predictedEntity in predictedEntityList:
-            if targetEntityList.count(predictedEntity): # check if the predicted entity is not 'unknown'
-                res[predictedEntity].append(event.m_id)
-    return res
-'''
-
 def argmaxEventEntity(doc, linkedEvents, targetEntityList, w, local_feat_dict, global_feat_dict):
     '''Find the argmax'''
     ew = w[0:500]
@@ -426,64 +379,6 @@ def argmaxEventEntity(doc, linkedEvents, targetEntityList, w, local_feat_dict, g
     best_seq = thisViterbi.return_max()
     
     return (best_seq, 0)
-
-class hmmClass(object):
-    def __init__(self,labels, tProb, eProb, tw, ew):
-        self.labels = labels
-        self.tProb=tProb
-        self.eProb=eProb
-        self.tw=tw
-        self.ew=ew
-
-class Viterbi:
-    trell = []
-    def __init__(self, hmm, words):
-        self.trell = []
-        temp = {}
-        for label in hmm.labels:
-           temp[label] = [0,None]
-        for word in words:
-            self.trell.append([word,copy.deepcopy(temp)])
-        self.fill_in(hmm)
-
-    def fill_in(self,hmm):
-        for i in range(len(self.trell)):
-            for token in self.trell[i][1]:
-                word = self.trell[i][0]
-                if i == 0:
-                    self.trell[i][1][token][0] = np.dot(hmm.eProb[(word, token)], hmm.ew)
-                else:
-                    max = None
-                    guess = None
-                    c = None
-                    prev_word = self.trell[i-1][0]
-                    for k in self.trell[i-1][1]:
-                        c = self.trell[i-1][1][k][0] + np.dot(hmm.tProb[((prev_word, k), (word, token))], hmm.tw)
-                        if max == None or c > max:
-                            max = c
-                            guess = k
-                    max += np.dot(hmm.eProb[(word, token)], hmm.ew)
-                    self.trell[i][1][token][0] = max
-                    self.trell[i][1][token][1] = guess
-
-    def return_max(self):
-        tokens = []
-        token = None
-        for i in range(len(self.trell)-1,-1,-1):
-            if token == None:
-                max = None
-                guess = None
-                for k in self.trell[i][1]:
-                    if max == None or self.trell[i][1][k][0] > max:
-                        max = self.trell[i][1][k][0]
-                        token = self.trell[i][1][k][1]
-                        guess = k
-                tokens.append(guess)
-            else:
-                tokens.append(token)
-                token = self.trell[i][1][token][1]
-        tokens.reverse()
-        return tokens
 
 def getGlobalFeatures(doc, t0, t1):
     '''t0 and t1 are adjacent hidden variables in a HMM representing a (event, timex) tuple.'''

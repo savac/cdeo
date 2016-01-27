@@ -1,6 +1,6 @@
 import json
 
-config_json_loc = '/home/sc15/projects/cdeo/code/cdeo_config.json'
+config_json_loc = '/home/sc/projects/cdeo/code/cdeo_config.json'
 
 def setDefaults():
     defaults = {
