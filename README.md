@@ -34,4 +34,4 @@ To train on the Apple corpus (corpus 0) and test on the Airbus (corpus 1), GM (c
 |HeidelToul_1|19.6|7.3|20.4|20.1|14.8|17.0|
 |HeidelToul_2|16.5|10.9|25.9|13.6|28.2|18.3|
 |Thesis|25.5|25.8|36.6|29.8|28.2| 28.7|
-|Paper|28.4|19.6|26.2|?|?|?|
+|Paper|27.8|24.2|29.9|?|?|?|
