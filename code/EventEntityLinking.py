@@ -142,80 +142,71 @@ def getLinkFeatures(doc, event, targetEntity, syntactic_features):
     event_sentence = utils.getToken(doc, event_t_id).sentence
     for en in doc.Markables.ENTITY_MENTION:
         if en.get_type() == targetEntity: 
-            
+            ind = 0 # reset feature index
             entity_t_id = en.get_token_anchor()[0].t_id # use the first token of the entity trigger
             entity_sentence = utils.getToken(doc, entity_t_id).sentence
             entity_text = utils.getEntityText(doc, en)
             
-            ind = 0
-            if event_sentence == entity_sentence:
-                features[ind] = 1
-            ind += 1
-            if event_sentence - entity_sentence == -1:
-                features[ind] = 1
-            ind += 1
-            if event_sentence - entity_sentence == 1:
-                features[ind] = 1
-            ind += 1
+            if entity_sentence == event_sentence: # only consider target entities in the same sentence
 
-            # bins of 1 unit token distance
-            d = event_t_id - entity_t_id
-            n = 20
-            bin_size = 1.0
-            if abs(d) <= n:
-                thisBin = int(np.fix(d/bin_size))
-                features[ind+thisBin+int(n/bin_size)] = 1
-            ind += 2*(n/bin_size)+1  # 21
+                # bins of 1 unit token distance
+                d = event_t_id - entity_t_id
+                n = 20
+                bin_size = 1.0
+                if abs(d) <= n:
+                    thisBin = int(np.fix(d/bin_size))
+                    features[ind+thisBin+int(n/bin_size)] = 1
+                ind += 2*(n/bin_size)+1  # 21
 
-            # bins of 2 unit token distance
-            d = event_t_id - entity_t_id
-            n = 20
-            bin_size = 2.0
-            if abs(d) <= n:
-                thisBin = int(np.fix(d/bin_size))
-                features[ind+thisBin+int(n/bin_size)] = 1
-            ind += 2*(n/bin_size)+1  # 21
+                # bins of 2 unit token distance
+                d = event_t_id - entity_t_id
+                n = 20
+                bin_size = 2.0
+                if abs(d) <= n:
+                    thisBin = int(np.fix(d/bin_size))
+                    features[ind+thisBin+int(n/bin_size)] = 1
+                ind += 2*(n/bin_size)+1  # 21
 
-            # bins of 5 unit token distance
-            d = event_t_id - entity_t_id
-            n = 40
-            bin_size = 5.0
-            if abs(d) <= n:
-                thisBin = int(np.fix(d/bin_size))
-                features[ind+thisBin+int(n/bin_size)] = 1
-            ind += 2*(n/bin_size)+1  # 17
+                # bins of 5 unit token distance
+                d = event_t_id - entity_t_id
+                n = 40
+                bin_size = 5.0
+                if abs(d) <= n:
+                    thisBin = int(np.fix(d/bin_size))
+                    features[ind+thisBin+int(n/bin_size)] = 1
+                ind += 2*(n/bin_size)+1  # 17
 
-            # bins of 10 unit token distance
-            d = event_t_id - entity_t_id
-            n = 50
-            bin_size = 10.0
-            if abs(d) <= n:
-                thisBin = int(np.fix(d/bin_size))
-                features[ind+thisBin+int(n/bin_size)] = 1
-            ind += 2*(n/bin_size)+1  # 11
-            
-            # syntactic dependencies
-            '''
-            <dep type="nsubj">
-              <governor idx="2">unveils</governor>
-              <dependent idx="1">Apple</dependent>
-            </dep>
-            <dep type="dobj">
-              <governor idx="2">unveils</governor>
-              <dependent idx="3">iPhone</dependent>
-            </dep>
-            '''
-            if event_sentence == entity_sentence:
-                wanted_sentence = event_sentence
-                deps = doc.root[0][0][wanted_sentence][2] # NB: note the indexing! The title is a separate sentence in CAT but it's merged into 1st sentence in Stanford NLP parse.
+                # bins of 10 unit token distance
+                d = event_t_id - entity_t_id
+                n = 50
+                bin_size = 10.0
+                if abs(d) <= n:
+                    thisBin = int(np.fix(d/bin_size))
+                    features[ind+thisBin+int(n/bin_size)] = 1
+                ind += 2*(n/bin_size)+1  # 11
+                
+                # syntactic dependencies
+                '''
+                <dep type="nsubj">
+                  <governor idx="2">unveils</governor>
+                  <dependent idx="1">Apple</dependent>
+                </dep>
+                <dep type="dobj">
+                  <governor idx="2">unveils</governor>
+                  <dependent idx="3">iPhone</dependent>
+                </dep>
+                '''
+                if event_sentence == entity_sentence:
+                    wanted_sentence = event_sentence
+                    deps = doc.root[0][0][wanted_sentence][2] # NB: note the indexing! The title is a separate sentence in CAT but it's merged into 1st sentence in Stanford NLP parse.
 
-                for dep in deps:
-                    if utils.getEventTextFull(doc, event).split('_').count(dep[0].text.lower()) and entity_text.split(' ').count(dep[1].text):
-                        for i in range(len(syntactic_features)):
-                            if dep.values()[0] == syntactic_features[i]:
-                                #print  str(ind+i) + ': [' + targetEntity + ']', dep[1].text, dep[0].text, ':' + syntactic_features[i], event_sentence, doc.get_doc_id()
-                                features[ind+i] = 1  
-            #ind += len(syntactic_features)
+                    for dep in deps:
+                        if utils.getEventTextFull(doc, event).split('_').count(dep[0].text.lower()) and entity_text.split(' ').count(dep[1].text):
+                            for i in range(len(syntactic_features)):
+                                if dep.values()[0] == syntactic_features[i]:
+                                    #print  str(ind+i) + ': [' + targetEntity + ']', dep[1].text, dep[0].text, ':' + syntactic_features[i], event_sentence, doc.get_doc_id()
+                                    features[ind+i] = 1  
+                #ind += len(syntactic_features)
                 
     return features
     
