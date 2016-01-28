@@ -18,7 +18,7 @@ It needs to run from the code/ directory
 
 ```python -c "import cdeo; cdeo.startUWTimeServer()"```
 
-To train on the Apple corpus (corpus 0) and test on the Airbus corpus (corpus 1)
+To train on the Apple corpus (corpus 0) and test on the Airbus (corpus 1), GM (corpus 2) and Stock Markets (corpus 3) corpora run
 
-```python -c "import cdeo; cdeo.run(1, [0])"```
+```python -c "import cdeo; cdeo.run(test_corpus_list=[1,2,3], train_corpus_list=[0])"```
 
