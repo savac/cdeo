@@ -22,27 +22,27 @@ reload(EventEntityLinking)
 reload(EventTIMEX3Linking)
 reload(Ordering)
 
+# init stemmer
+stemmer = porter.PorterStemmer()
+
 def startUWTimeServer():
     h = subprocess.Popen(['java','-jar',cdeo_config.getConfig("uwtime_loc")])
     return h
 
 def getCollection(ncorpus):
+    print 'Reading in corpus %d...' %(ncorpus)
     
     corpus = ncorpus
     inFileEntity = '../data/evaluation/corpus_%s/list_target_entities_corpus_%s.txt' %(corpus, corpus)
     inDirCAT= '../data/evaluation/corpus_%s/corpus_trackB_CAT' %(corpus)
     
     targetEntityList = utils.loadEntityList(inFileEntity)
-    #print targetEntityList
     collection = utils.loadDocs(inDirCAT)
-    #print len(collection)
     
     # annotate timestamps and target entities
     collection0 = []
     
     for indoc in collection:
-        #print indoc.get_doc_id()
-
         doc = TimestampExtraction.getTimestamps(indoc) # NB: doc 120578 has a mistake in the DCT annotation. The CAT files has been corrected by hand.
         doc = EntityExtraction.getEntitiesStanfordNLP(doc, targetEntityList)
         # NB: sort the events in the order that they appear in the text i.e. sort by token position
@@ -65,7 +65,7 @@ def evaluateEventEntityLinking(timeline, corpus, collection):
     targetEntityList = utils.loadEntityList(inFileEntity)
     goldList = utils.goldTimelineList(targetEntityList, goldTimelineDir)
 
-    sys.stdout.write('\n\nEvent to Entity Linking Evaluation (Entity, Recall, Precision, F1-score)\n')
+    sys.stdout.write('\nEvent to Entity Linking Evaluation (Entity, Recall, Precision, F1-score)\n')
 
     totalList = list()
     timeList = list()
@@ -125,7 +125,7 @@ def evaluateEventTIMEX3Linking(timeline, corpus, collection):
     targetEntityList = utils.loadEntityList(inFileEntity)
     goldList = utils.goldTimelineList(targetEntityList, goldTimelineDir) # ((docId, sen, event, targetEntity, tmpDate, tmpOrder))
 
-    sys.stdout.write('\n\nEvent to Timestamp Evaluation (Entity, Recall, Precision, F1-score)\n')
+    sys.stdout.write('\nEvent to Timestamp Evaluation (Entity, Recall, Precision, F1-score)\n')
 
     totalList = list()
     for targetEntity in timeline.keys():        
@@ -157,9 +157,8 @@ def run(corpus = 1, train_corpus_list = [0, 1]):
     4. Link events and timestamps
     5. Order
     '''
-        
-    # Train Event - Entity link classifier
-    
+
+    # Read in the training corpus 
     collection_train_list = list()
     entity_syntactic_features = list()
     timex_syntactic_features = list()
@@ -172,21 +171,21 @@ def run(corpus = 1, train_corpus_list = [0, 1]):
         entity_syntactic_features += EventEntityLinking.extractSyntacticFeatures(collection_train)
         timex_syntactic_features += EventTIMEX3Linking.extractSyntacticFeatures(collection_train)
 
+    # Train the link classifiers
     #clfEntity = EventEntityLinking.trainEventEntityClassifier(collection_train_list, entity_syntactic_features)    
     #clfTIMEX3 = EventTIMEX3Linking.trainEventTIMEX3Classifier(collection_train_list, timex_syntactic_features)
-
     w_ee = EventEntityLinking.structuredPredictionTraining(collection_train_list, entity_syntactic_features)   
     w = EventTIMEX3Linking.structuredPredictionTraining(collection_train_list, timex_syntactic_features)
 
-    # Test
+    # Read in, predict and evaluate the test corpus
+    # TBD: refactor
     (collection, targetEntityList) = getCollection(corpus)
     resDir = '../data/evaluation/corpus_%s/results/' %(corpus)
-
-    # set up stemmer
-    stemmer = porter.PorterStemmer()
-
-    # link
     timeline = dict()
+    print 'Predicting timeline ...'
+    # We create a dictionary to hold all the extracted linked events, entities and timestamps:
+    # Keys are target entities.
+    # Values are lists of tuples (doc_id, event_m_id, timex3_m_id, date)
     for doc in collection:
         #dictEventEntity = EventEntityLinking.linkEventEntityML(clfEntity, doc, targetEntityList, entity_syntactic_features)
         dictEventEntity = EventEntityLinking.linkEventEntitySP(w_ee, doc, targetEntityList, entity_syntactic_features)
@@ -202,9 +201,6 @@ def run(corpus = 1, train_corpus_list = [0, 1]):
             #print doc.get_doc_id(), targetEntity, listEventEntity
             listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3SP(w, doc, listEventEntity, timex_syntactic_features)
             #listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3ML(clfTIMEX3, doc, listEventEntity, timex_syntactic_features)
-            
-            # create a dictionary to hold all the extracted timelines. Keys are target entities.
-            # Values are lists of tuples (doc_id, event_m_id, timex3_m_id, date)
             
             if not timeline.has_key(targetEntity):
                 timeline[targetEntity] = list()
@@ -227,10 +223,10 @@ def run(corpus = 1, train_corpus_list = [0, 1]):
                 eventClusterId = 0
                 lst = [doc.get_doc_id(), event_m_id, timex3_m_id, this_date, order, event_sentence, str_event, event_stem, eventClusterId] # assign an order number of 1 for now
                 timeline[targetEntity].append(lst)
-
+    # Given the dictionary from above we order the tuples as sepcified by the CDEO task
     timeline = Ordering.order(collection, timeline)
     
-    # printing and saving to file
+    # printing and saving to file the predicted timelines
     for targetEntity in timeline.keys():
         fname = targetEntity.lower()
         fname = fname.replace('&', '_and_')
@@ -255,11 +251,11 @@ def run(corpus = 1, train_corpus_list = [0, 1]):
             last_stem = this_stem
         f.close()
 
+    # Evaluation
     evaluateEventEntityLinking(timeline, corpus, collection)
     evaluateEventTIMEX3Linking(timeline, corpus, collection)
-
     try:
-        print "\n\nEnd to end evaluation"
+        print "\nEnd to end evaluation"
         os.chdir('evaluation_tool')
         os.system(('python evaluation_all.py ../../data/evaluation/corpus_%d/TimeLines_Gold_Standard/ ../../data/evaluation/corpus_%d/results/' %(corpus,corpus)))
         #os.system(('python evaluation_all.py --ord ../../evaluation/corpus_%d/TimeLines_Gold_Standard/ ../../evaluation/corpus_%d/results/' %(corpus,corpus)))
