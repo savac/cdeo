@@ -1,6 +1,6 @@
 Scott Carson
-0	XXXX-XX-XX	71526-11-replied
 1	2007-06-10	71526-11-relationship
+1	2007-06-10	71526-11-replied
 2	2007-07-09	73808-5-said
 3	2008-05-24	106653-14-continuing
 3	2008-05-24	106653-16-deliverd

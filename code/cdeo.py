@@ -33,15 +33,15 @@ def getCollection(ncorpus):
     inDirCAT= '../data/evaluation/corpus_%s/corpus_trackB_CAT' %(corpus)
     
     targetEntityList = utils.loadEntityList(inFileEntity)
-    print targetEntityList
+    #print targetEntityList
     collection = utils.loadDocs(inDirCAT)
-    print len(collection)
+    #print len(collection)
     
     # annotate timestamps and target entities
     collection0 = []
     
     for indoc in collection:
-        print indoc.get_doc_id()
+        #print indoc.get_doc_id()
 
         doc = TimestampExtraction.getTimestamps(indoc) # NB: doc 120578 has a mistake in the DCT annotation. The CAT files has been corrected by hand.
         doc = EntityExtraction.getEntitiesStanfordNLP(doc, targetEntityList)
