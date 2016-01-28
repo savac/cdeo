@@ -30,8 +30,10 @@ def startUWTimeServer():
     return h
 
 def getCollection(ncorpus):
+    print '\n=============================================================='
     print 'Reading in corpus %d...' %(ncorpus)
-    
+    print '=============================================================='
+
     corpus = ncorpus
     inFileEntity = '../data/evaluation/corpus_%s/list_target_entities_corpus_%s.txt' %(corpus, corpus)
     inDirCAT= '../data/evaluation/corpus_%s/corpus_trackB_CAT' %(corpus)
@@ -149,7 +151,7 @@ def evaluateEventTIMEX3Linking(timeline, corpus, collection):
     sys.stdout.write(('%-30s\t%3.9f\t%3.9f\t%3.9f\n' %('Total', recall, precision, f1) )) 
 
 
-def run(corpus = 1, train_corpus_list = [0, 1]):
+def run(test_corpus_list = [1], train_corpus_list = [0]):
     ''' Run all the steps of timeline extraction:
     1. Extract timestamps
     2. Extract target entities
@@ -179,86 +181,87 @@ def run(corpus = 1, train_corpus_list = [0, 1]):
 
     # Read in, predict and evaluate the test corpus
     # TBD: refactor
-    (collection, targetEntityList) = getCollection(corpus)
-    resDir = '../data/evaluation/corpus_%s/results/' %(corpus)
-    timeline = dict()
-    print 'Predicting timeline ...'
-    # We create a dictionary to hold all the extracted linked events, entities and timestamps:
-    # Keys are target entities.
-    # Values are lists of tuples (doc_id, event_m_id, timex3_m_id, date)
-    for doc in collection:
-        #dictEventEntity = EventEntityLinking.linkEventEntityML(clfEntity, doc, targetEntityList, entity_syntactic_features)
-        dictEventEntity = EventEntityLinking.linkEventEntitySP(w_ee, doc, targetEntityList, entity_syntactic_features)
-        
-        for targetEntity in targetEntityList:
-            #link target entity and events
-            #listEventEntity = EventEntityLinking.linkEventEntityRuleBased(doc, targetEntity) # returns list of event m_id's
-            listEventEntity = dictEventEntity[targetEntity]
-            #print targetEntity, listEventEntity
+    for corpus in test_corpus_list:
+        (collection, targetEntityList) = getCollection(corpus)
+        resDir = '../data/evaluation/corpus_%s/results/' %(corpus)
+        timeline = dict()
+        print 'Predicting timeline ...'
+        # We create a dictionary to hold all the extracted linked events, entities and timestamps:
+        # Keys are target entities.
+        # Values are lists of tuples (doc_id, event_m_id, timex3_m_id, date)
+        for doc in collection:
+            #dictEventEntity = EventEntityLinking.linkEventEntityML(clfEntity, doc, targetEntityList, entity_syntactic_features)
+            dictEventEntity = EventEntityLinking.linkEventEntitySP(w_ee, doc, targetEntityList, entity_syntactic_features)
             
-            # link events to timestamps
-            #listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3(doc, listEventEntity)
-            #print doc.get_doc_id(), targetEntity, listEventEntity
-            listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3SP(w, doc, listEventEntity, timex_syntactic_features)
-            #listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3ML(clfTIMEX3, doc, listEventEntity, timex_syntactic_features)
-            
-            if not timeline.has_key(targetEntity):
-                timeline[targetEntity] = list()
-            for event_time in listEventTIMEX3:
-                (event_m_id, timex3_m_id) = event_time
-                this_date = utils.str2date(utils.getTIMEX3Stamp(doc, timex3_m_id))
-
-                event = utils.getEvent(doc, event_m_id)
-                event_t_id = event.get_token_anchor()[0].t_id
-                event_sentence = utils.getToken(doc, event_t_id).sentence
+            for targetEntity in targetEntityList:
+                #link target entity and events
+                #listEventEntity = EventEntityLinking.linkEventEntityRuleBased(doc, targetEntity) # returns list of event m_id's
+                listEventEntity = dictEventEntity[targetEntity]
+                #print targetEntity, listEventEntity
                 
-                str_event = []
-                for a in event.get_token_anchor():
-                    str_event.append(doc.token[a.t_id-1].get_valueOf_()) # TBD: better to look for tokens searching by t_id.
-                event_stem = stemmer.stem(str_event[0])
-                str_event = '_'.join(str_event)
-                str_event = str_event.lower()
+                # link events to timestamps
+                #listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3(doc, listEventEntity)
+                #print doc.get_doc_id(), targetEntity, listEventEntity
+                listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3SP(w, doc, listEventEntity, timex_syntactic_features)
+                #listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3ML(clfTIMEX3, doc, listEventEntity, timex_syntactic_features)
                 
-                order = 1
-                eventClusterId = 0
-                lst = [doc.get_doc_id(), event_m_id, timex3_m_id, this_date, order, event_sentence, str_event, event_stem, eventClusterId] # assign an order number of 1 for now
-                timeline[targetEntity].append(lst)
-    # Given the dictionary from above we order the tuples as sepcified by the CDEO task
-    timeline = Ordering.order(collection, timeline)
-    
-    # printing and saving to file the predicted timelines
-    for targetEntity in timeline.keys():
-        fname = targetEntity.lower()
-        fname = fname.replace('&', '_and_')
-        fname = resDir + re.sub('[^0-9a-z]+', '_', fname) + '.txt'
-        f = open(fname, 'w')
-        f.write(targetEntity)    
+                if not timeline.has_key(targetEntity):
+                    timeline[targetEntity] = list()
+                for event_time in listEventTIMEX3:
+                    (event_m_id, timex3_m_id) = event_time
+                    this_date = utils.str2date(utils.getTIMEX3Stamp(doc, timex3_m_id))
+
+                    event = utils.getEvent(doc, event_m_id)
+                    event_t_id = event.get_token_anchor()[0].t_id
+                    event_sentence = utils.getToken(doc, event_t_id).sentence
+                    
+                    str_event = []
+                    for a in event.get_token_anchor():
+                        str_event.append(doc.token[a.t_id-1].get_valueOf_()) # TBD: better to look for tokens searching by t_id.
+                    event_stem = stemmer.stem(str_event[0])
+                    str_event = '_'.join(str_event)
+                    str_event = str_event.lower()
+                    
+                    order = 1
+                    eventClusterId = 0
+                    lst = [doc.get_doc_id(), event_m_id, timex3_m_id, this_date, order, event_sentence, str_event, event_stem, eventClusterId] # assign an order number of 1 for now
+                    timeline[targetEntity].append(lst)
+        # Given the dictionary from above we order the tuples as sepcified by the CDEO task
+        timeline = Ordering.order(collection, timeline)
         
-        last_eventClusterId = -1
-        for lst in timeline[targetEntity]:
-            [doc_id, event_m_id, timex3_m_id, this_date, order, nsentence, str_event, this_stem, eventClusterId] = lst
-
-            doc = utils.getDoc(collection, doc_id)
+        # printing and saving to file the predicted timelines
+        for targetEntity in timeline.keys():
+            fname = targetEntity.lower()
+            fname = fname.replace('&', '_and_')
+            fname = resDir + re.sub('[^0-9a-z]+', '_', fname) + '.txt'
+            f = open(fname, 'w')
+            f.write(targetEntity)    
             
-            date_str = utils.getTIMEX3Stamp(doc, timex3_m_id)
+            last_eventClusterId = -1
+            for lst in timeline[targetEntity]:
+                [doc_id, event_m_id, timex3_m_id, this_date, order, nsentence, str_event, this_stem, eventClusterId] = lst
 
-            # docid-sentence, event, timex3, timex3 text
-            if eventClusterId == last_eventClusterId: # TBD: this is flaky as we only check events adjacent in timeline
-                f.write('\t' + str(doc.doc_id) + '-' + str(nsentence)+ '-' + str_event) #+  "\t('" + str_timex + "')" 
-            else:
-                f.write('\n' + str(order) + '\t' + date_str + '\t' + str(doc_id) + '-' + str(nsentence)+ '-' + str_event) #+  "\t('" + str_timex + "')" 
-            last_eventClusterId = eventClusterId
-            last_stem = this_stem
-        f.close()
+                doc = utils.getDoc(collection, doc_id)
+                
+                date_str = utils.getTIMEX3Stamp(doc, timex3_m_id)
 
-    # Evaluation
-    evaluateEventEntityLinking(timeline, corpus, collection)
-    evaluateEventTIMEX3Linking(timeline, corpus, collection)
-    try:
-        print "\nEnd to end evaluation"
-        os.chdir('evaluation_tool')
-        os.system(('python evaluation_all.py ../../data/evaluation/corpus_%d/TimeLines_Gold_Standard/ ../../data/evaluation/corpus_%d/results/' %(corpus,corpus)))
-        #os.system(('python evaluation_all.py --ord ../../evaluation/corpus_%d/TimeLines_Gold_Standard/ ../../evaluation/corpus_%d/results/' %(corpus,corpus)))
-        os.chdir('..')
-    except:
-        print 'Evaluation error'
+                # docid-sentence, event, timex3, timex3 text
+                if eventClusterId == last_eventClusterId: # TBD: this is flaky as we only check events adjacent in timeline
+                    f.write('\t' + str(doc.doc_id) + '-' + str(nsentence)+ '-' + str_event) #+  "\t('" + str_timex + "')" 
+                else:
+                    f.write('\n' + str(order) + '\t' + date_str + '\t' + str(doc_id) + '-' + str(nsentence)+ '-' + str_event) #+  "\t('" + str_timex + "')" 
+                last_eventClusterId = eventClusterId
+                last_stem = this_stem
+            f.close()
+
+        # Evaluation
+        evaluateEventEntityLinking(timeline, corpus, collection)
+        evaluateEventTIMEX3Linking(timeline, corpus, collection)
+        try:
+            print "\nEnd to end evaluation"
+            os.chdir('evaluation_tool')
+            os.system(('python evaluation_all.py ../../data/evaluation/corpus_%d/TimeLines_Gold_Standard/ ../../data/evaluation/corpus_%d/results/' %(corpus,corpus)))
+            #os.system(('python evaluation_all.py --ord ../../evaluation/corpus_%d/TimeLines_Gold_Standard/ ../../evaluation/corpus_%d/results/' %(corpus,corpus)))
+            os.chdir('..')
+        except:
+            print 'Evaluation error'

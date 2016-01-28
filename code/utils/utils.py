@@ -21,12 +21,12 @@ def loadDocs(inDir):
 
 def loadEntityList(inFile):
     lst = list()
-    f = open(inFile, 'r')
-    while True:
-        f_line = f.readline()
-        if f_line == "":
-            break
-        lst.append(f_line.rstrip())
+    with open(inFile, 'r') as f:
+        while True:
+            f_line = f.readline()
+            if f_line == "":
+                break
+            lst.append(f_line.rstrip())
     return lst
 
 def getDCT(doc):
