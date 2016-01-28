@@ -8,6 +8,9 @@ http://alt.qcri.org/semeval2015/task4/
 2. Download if required the Stanford CoreNLP (tested with version 3.5.2)
 3. Update the fields "root_dir", "uwtime_loc", "stanfordcorenlp_loc" in code/cdeo_config.json with corresponding absolute paths.
 4. Update variable <i>config_json_loc</i> in code/cdeo_config.py witht the absolute path to code/cdeo_config.json.
+5. Install the python-levenshtein package. If you are using conda, run:
+
+```conda install -c https://conda.anaconda.org/faircloth-lab python-levenshtein```
 
 ##### Running
 It needs to run from the code/ directory
