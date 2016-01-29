@@ -178,6 +178,8 @@ def run(test_corpus_list = [1], train_corpus_list = [0]):
     #clfTIMEX3 = EventTIMEX3Linking.trainEventTIMEX3Classifier(collection_train_list, timex_syntactic_features)
     w_ee = EventEntityLinking.structuredPredictionTraining(collection_train_list, entity_syntactic_features)   
     w = EventTIMEX3Linking.structuredPredictionTraining(collection_train_list, timex_syntactic_features)
+    print w_ee
+    print w
 
     # Read in, predict and evaluate the test corpus
     # TBD: refactor

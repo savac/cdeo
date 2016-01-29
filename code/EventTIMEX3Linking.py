@@ -408,7 +408,7 @@ def structuredPredictionTraining(collection_train_list, syntactic_features):
                             for t1 in allTimex:
                                 global_feat_dict[((prev_event, t0),(event, t1))] = getGlobalFeatures(doc, (prev_event, t0), (event, t1))
                     
-                    if len(linkedEvents) and len(allTimex): # and len(allTimex) < 4:
+                    if len(linkedEvents) and len(allTimex):
                         (linkedTimex_pred, pred) = argmaxEventTIMEX(doc, linkedEvents, allTimex, w, local_feat_dict, global_feat_dict)
                                                 
                         if not tuple(linkedTimex) == linkedTimex_pred:

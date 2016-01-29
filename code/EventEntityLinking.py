@@ -137,7 +137,7 @@ def getLinkFeatures(doc, event, targetEntity, syntactic_features):
     sentence_flag = False
     #features_init = np.zeros(500) # features
     features = np.zeros(500) # features
-    
+        
     event_t_id = event.get_token_anchor()[0].t_id
     event_sentence = utils.getToken(doc, event_t_id).sentence
     for en in doc.Markables.ENTITY_MENTION:
@@ -148,6 +148,16 @@ def getLinkFeatures(doc, event, targetEntity, syntactic_features):
             entity_text = utils.getEntityText(doc, en)
             
             if entity_sentence == event_sentence: # only consider target entities in the same sentence
+                # sum of mentions in the document
+                #d = np.sum([1 for x in doc.Markables.ENTITY_MENTION if x.get_type() == targetEntity])
+                #features[ind] = d
+                #ind += 1
+                #n = 20
+                #bin_size = 1.0
+                #if abs(d) <= n:
+                #    thisBin = int(np.fix(d/bin_size))
+                #    features[ind+thisBin] = 1
+                #ind += (n/bin_size)  # 20
 
                 # bins of 1 unit token distance
                 d = event_t_id - entity_t_id
@@ -156,7 +166,7 @@ def getLinkFeatures(doc, event, targetEntity, syntactic_features):
                 if abs(d) <= n:
                     thisBin = int(np.fix(d/bin_size))
                     features[ind+thisBin+int(n/bin_size)] = 1
-                ind += 2*(n/bin_size)+1  # 21
+                ind += 2*(n/bin_size)+1  # 41
 
                 # bins of 2 unit token distance
                 d = event_t_id - entity_t_id
@@ -167,23 +177,14 @@ def getLinkFeatures(doc, event, targetEntity, syntactic_features):
                     features[ind+thisBin+int(n/bin_size)] = 1
                 ind += 2*(n/bin_size)+1  # 21
 
-                # bins of 5 unit token distance
+                # bins of 3 unit token distance
                 d = event_t_id - entity_t_id
-                n = 40
-                bin_size = 5.0
+                n = 30
+                bin_size = 2.0
                 if abs(d) <= n:
                     thisBin = int(np.fix(d/bin_size))
                     features[ind+thisBin+int(n/bin_size)] = 1
-                ind += 2*(n/bin_size)+1  # 17
-
-                # bins of 10 unit token distance
-                d = event_t_id - entity_t_id
-                n = 50
-                bin_size = 10.0
-                if abs(d) <= n:
-                    thisBin = int(np.fix(d/bin_size))
-                    features[ind+thisBin+int(n/bin_size)] = 1
-                ind += 2*(n/bin_size)+1  # 11
+                ind += 2*(n/bin_size)+1  # 21
                 
                 # syntactic dependencies
                 '''
@@ -249,12 +250,12 @@ def structuredPredictionTraining(collection_train_list, syntactic_features):
     print "Training Event to Entity linking model ..."
     for i in range(15): # number of iterations
         print 'Structured Perceptron Iteration: ', i
-        lrate = 0.9*lrate
+        lrate = 0.95*lrate
         # do the prep
-        # TBD: speed this up by saving
         for tup in collection_train_list:
             (collection, targetEntityList) = tup
-            #random.shuffle(collection)
+            targetEntityList += [None]
+            random.shuffle(collection)
             for doc in collection:
 
                 # get lists of linked events and entities
@@ -262,8 +263,7 @@ def structuredPredictionTraining(collection_train_list, syntactic_features):
                 linkedEntities = list()
                 for event in doc.Markables.EVENT_MENTION:
                     goldEntity = event.get_linkedEntityName()
-                    if goldEntity == None: # is this used?
-                        #continue
+                    if goldEntity == None: # Assume there are event mentions in the text that do not appear on the gold timeline
                         linkedEvents.append(event)
                         linkedEntities.append(None)
                     else:
@@ -292,8 +292,9 @@ def structuredPredictionTraining(collection_train_list, syntactic_features):
                         for e1 in targetEntityList:
                             global_feat_dict[((prev_event, e0),(event, e1))] = getGlobalFeatures(doc, (prev_event, e0), (event, e1))
                 
-                if len(linkedEvents) and len(targetEntityList): # and len(allTimex) < 4:
+                if len(linkedEvents) and len(targetEntityList):
                     (linkedEntities_pred, pred) = argmaxEventEntity(doc, linkedEvents, targetEntityList, w, local_feat_dict, global_feat_dict)
+                    #print linkedEntities, linkedEntities_pred
                                             
                     if not tuple(linkedEntities) == linkedEntities_pred:
                         w = w + (getPHI(doc, linkedEvents, linkedEntities, local_feat_dict, global_feat_dict) - getPHI(doc, linkedEvents, linkedEntities_pred, local_feat_dict, global_feat_dict))
@@ -416,8 +417,10 @@ def getGlobalFeatures(doc, t0, t1):
 
     # talking words
     talking_words = ['said','presented','explained','proposed','stated','thanked','refused','described','pointed','responded','anticipated','concluded', 'called', 'praised']
+    #talking_words = []
     # timex and event string type
     if entity0 == entity1 and talking_words.count(str_event0) and talking_words.count(str_event1):
+        #print (str_event0, entity0), (str_event1, entity1)
         features[ind] = 1
     ind += 1
 
