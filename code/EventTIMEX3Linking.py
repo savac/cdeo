@@ -79,7 +79,7 @@ def trainEventTIMEX3Classifier(collection_train_list, syntactic_features):
                     #print doc.get_doc_id(), utils.getEventText(doc, event), goldTimestamp
 
                     for m_id in idsList:
-                        features = getLinkFeatures(doc, event, m_id, syntactic_features)
+                        features = getLocalFeatures(doc, event, m_id, syntactic_features)
                         featuresList.append(features)
                         
                         if m_id == idGold:
@@ -115,7 +115,223 @@ def findGoldTIMEX3Id(doc, event, goldTimestamp):
                 best_dist = abs(event_t_id - timex_t_id)
     return best_m_id
 
-def getLinkFeatures(doc, event, timex_m_id, syntactic_features):
+def predictEventTIMEX3Link(clf, doc, event, syntactic_features):
+    '''Given a trained classifier predict the TIMEX3 associated with the Event'''
+    timexList = list()
+    features = list()
+    wanted_type = ['DATE', 'TIME']
+    for timex in doc.Markables.TIMEX3:
+        if wanted_type.count(timex.get_type()):
+            features.append(getLocalFeatures(doc, event, timex.m_id, syntactic_features))
+            timexList.append(timex.m_id)
+    predicted_prob = clf.predict_proba(features)
+    predicted_prob = [x[1] for x in predicted_prob] # get the '1' label in the 2nd column
+    imax = np.argmax(predicted_prob)
+
+    if predicted_prob[imax] > 0.1: # increase to increase precision at the cost of recall
+        best_timex = timexList[imax]
+        # deal with future dates wrt to dct: no event should be associated with a future date.
+        this_date = utils.str2date(utils.getTIMEX3Stamp(doc, best_timex))
+        dct_date = utils.str2date(doc.Markables.get_DCT().value)
+
+        if this_date > dct_date:
+            best_timex = doc.Markables.get_DCT().m_id # assing the m_id = 0, which should be the DCT
+        return best_timex
+    else:
+        return None
+
+
+def extractSyntacticFeatures(collection):
+    res = list()
+    for doc in collection:
+        for event in doc.Markables.EVENT_MENTION:
+            event_t_id = event.get_token_anchor()[0].t_id
+            event_sentence = utils.getToken(doc, event_t_id).sentence
+            event_text = utils.getEventTextFull(doc, event)
+            
+            goldTimestamp = event.get_linkedTimestamp()
+            if goldTimestamp == 'XXXX-XX-XX': # we cannot find this timestamp in text
+                continue
+            else:
+                event_t_id = event.get_token_anchor()[0].t_id
+                timex_m_id = findGoldTIMEX3Id(doc, event, goldTimestamp)
+                if timex_m_id == None:
+                    continue
+
+            timex = utils.getTIMEX3(doc, timex_m_id)
+            timex_t_id = timex.get_token_anchor()[-1].t_id # use the last token of the entity trigger
+            timex_sentence = utils.getToken(doc, timex_t_id).sentence
+            timex_text = utils.getTIMEX3Text(doc, timex)
+            
+            wanted_sentence = event_sentence 
+            try:
+                deps = doc.root[0][0][wanted_sentence][2] # NB: note the indexing! The title is a separate sentence in CAT but it's merged into 1st sentence in Stanford NLP parse.
+            except IndexError:
+                pass
+
+            for dep in deps:
+                if event_text.split('_').count(dep[0].text.lower()) and timex_text.split(' ').count(dep[1].text):
+                    #print event_text + ',' + timex_text + ',' + dep.values()[0]
+                    if res.count(dep.values()[0]) == 0:
+                        res.append(dep.values()[0])
+    #print res
+    return res
+
+
+
+def structuredPredictionTraining(collection_train_list, syntactic_features):
+    '''Takes a collection that has been annotated with the gold timeline. Returns a classifier for the event-timex3 links.'''
+    # initiate the weights vector
+    w = np.zeros(510)
+    wa = np.zeros(510)
+    c = 1.0
+    lrate = 1
+        
+    trainError = list()
+    wanted_type = ['DATE','TIME']
+    print "Training Event to TIMEX linking model ..."
+    for i in range(0,15): # number of iterations
+        print 'Structured Perceptron Iteration: ', i
+        lrate = 0.8*lrate
+        # do the prep
+        # TBD: speed this up by saving
+        for tup in collection_train_list:
+            (collection, targetEntityList) = tup
+            #random.shuffle(collection)
+            for doc in collection:
+                for targetEntity in targetEntityList:
+                    #print doc.get_doc_id(), targetEntity
+                    
+                    # get the list of all TIMEX m_id's
+                    allTimex = [None] # allow for a possibility of not matching with an actual timex 
+                    for t in doc.Markables.TIMEX3:
+                        if wanted_type.count(t.get_type()):
+                            allTimex.append(t.m_id)
+                    
+                    # get lists of linked events and timex
+                    linkedEvents = list()
+                    linkedTimex = list()
+                    for event in doc.Markables.EVENT_MENTION:
+                        if event.get_linkedEntityName() == targetEntity:
+                            goldTimestamp = event.get_linkedTimestamp()
+                            if goldTimestamp == 'XXXX-XX-XX': # we also train on instances that have an undefined timestamp
+                                #continue
+                                linkedEvents.append(event)
+                                linkedTimex.append(None)
+                            else:
+                                idGold = findGoldTIMEX3Id(doc, event, goldTimestamp)
+                                if not idGold == None:  # only if we can find this timestamp in text
+                                    linkedEvents.append(event)
+                                    linkedTimex.append(idGold)
+
+
+                    # for each document we have:
+                    # - a list of events in linkedEvents
+                    # - a corresponding list (training set) of linked timex m_id in linkedTimex
+                    # - a list of all timex in allTimex
+                    # - getLocalFeatures(doc, event, m_id, syntactic_features) will get the features for every event-timex pair
+                    # - getGlobalFeatures(doc, (prev_event, t0), (event, t1)) will get the features for consecutive event-timex pairs
+                    # - argmaxEventTIMEX(doc, event, allTimex, w)
+                    
+                    # precompute features
+                    local_feat_dict = dict()
+                    for event in linkedEvents:
+                        for timex in allTimex:
+                            local_feat_dict[(event, timex)] = getLocalFeatures(doc, event, timex, syntactic_features)
+                            
+                    global_feat_dict = dict()
+                    for e in range(1, len(linkedEvents)):
+                        prev_event = linkedEvents[e-1]
+                        event = linkedEvents[e]
+                        for t0 in allTimex:
+                            for t1 in allTimex:
+                                global_feat_dict[((prev_event, t0),(event, t1))] = getGlobalFeatures(doc, (prev_event, t0), (event, t1))
+                    
+                    if len(linkedEvents) and len(allTimex):
+                        (linkedTimex_pred, pred) = argmaxEventTIMEX(doc, linkedEvents, allTimex, w, local_feat_dict, global_feat_dict)
+                                                
+                        if not tuple(linkedTimex) == linkedTimex_pred:
+                            w = w + (getPHI(doc, linkedEvents, linkedTimex, local_feat_dict, global_feat_dict) - getPHI(doc, linkedEvents, linkedTimex_pred, local_feat_dict, global_feat_dict))
+                        wa = wa + w
+                        c += 1
+    return wa/c
+
+def getPHI(doc, listEvents, listTimex, local_feat_dict, global_feat_dict):
+    PHI = np.zeros(500)
+    
+    # local features
+    for event, timex in zip(listEvents, listTimex):
+        PHI += local_feat_dict[(event, timex)]
+        
+    # global features
+    PHI2 = np.zeros(10)
+    for ind in range(1, len(listEvents)):
+        prev_event = listEvents[ind-1]
+        prev_timex = listTimex[ind-1]
+        event = listEvents[ind]
+        timex = listTimex[ind]
+        PHI2 += global_feat_dict[((prev_event, prev_timex),(event, timex))]
+        
+    return np.append(PHI, PHI2)
+
+def structuredPrediction(w, doc, listEvents, syntactic_features):
+    '''Given the weights from the structured perceptron predict the TIMEX3 associated with the Event'''
+    # get timex list
+    timexList = [None] # allow for a possibility of no match
+    wanted_type = ['DATE', 'TIME']
+    for timex in doc.Markables.TIMEX3:
+        if wanted_type.count(timex.get_type()):
+            #if not utils.getTIMEX3Stamp(doc, timex.m_id) == 'XXXX-XX-XX': # TBD: is this right?
+            timexList.append(timex.m_id)
+            
+    # precompute features
+    local_feat_dict = dict()
+    for event in listEvents:
+        for timex in timexList:
+            local_feat_dict[(event, timex)] = getLocalFeatures(doc, event, timex, syntactic_features)
+    
+    global_feat_dict = dict()
+    for e in range(1, len(listEvents)):
+        prev_event = listEvents[e-1]
+        event = listEvents[e]
+        for t0 in timexList:
+            for t1 in timexList:
+                global_feat_dict[((prev_event, t0),(event, t1))] = getGlobalFeatures(doc, (prev_event, t0), (event, t1))
+    
+    (best_seq, best_pred) = argmaxEventTIMEX(doc, listEvents, timexList, w, local_feat_dict, global_feat_dict)
+
+    return best_seq
+
+def linkEventTIMEX3SP(w, doc, eventMIdList, syntactic_features):
+    res = list()
+    listEvents = list()
+    
+    if len(eventMIdList):
+        for event_m_id in eventMIdList:
+            listEvents.append(utils.getEvent(doc, event_m_id))
+        
+        predictedTIMEX_list = structuredPrediction(w, doc, listEvents, syntactic_features)
+            
+        for i in range(0, len(eventMIdList)):
+            res.append((eventMIdList[i], predictedTIMEX_list[i]))
+
+    return res
+    
+def getGEN(len_events, allTimex):
+    return list(itertools.product(allTimex, repeat=len_events))
+
+def argmaxEventTIMEX(doc, linkedEvents, allTimex, w, local_feat_dict, global_feat_dict):
+    '''Find the argmax'''
+    ew = w[0:500]
+    tw = w[500:510]
+    hmm = hmmClass(allTimex, global_feat_dict, local_feat_dict, tw, ew)
+    
+    thisViterbi = Viterbi(hmm, linkedEvents)
+    best_seq = thisViterbi.return_max()
+    
+    return (best_seq, 0)
+
+def getLocalFeatures(doc, event, timex_m_id, syntactic_features):
     '''Get the feature vector for the event and the target entity.
     Feature 1: abs(distance in tokens)
     Feature 2: abs(distance in sentences)
@@ -276,222 +492,6 @@ def getLinkFeatures(doc, event, timex_m_id, syntactic_features):
 
     return features
 
-def predictEventTIMEX3Link(clf, doc, event, syntactic_features):
-    '''Given a trained classifier predict the TIMEX3 associated with the Event'''
-    timexList = list()
-    features = list()
-    wanted_type = ['DATE', 'TIME']
-    for timex in doc.Markables.TIMEX3:
-        if wanted_type.count(timex.get_type()):
-            features.append(getLinkFeatures(doc, event, timex.m_id, syntactic_features))
-            timexList.append(timex.m_id)
-    predicted_prob = clf.predict_proba(features)
-    predicted_prob = [x[1] for x in predicted_prob] # get the '1' label in the 2nd column
-    imax = np.argmax(predicted_prob)
-
-    if predicted_prob[imax] > 0.1: # increase to increase precision at the cost of recall
-        best_timex = timexList[imax]
-        # deal with future dates wrt to dct: no event should be associated with a future date.
-        this_date = utils.str2date(utils.getTIMEX3Stamp(doc, best_timex))
-        dct_date = utils.str2date(doc.Markables.get_DCT().value)
-
-        if this_date > dct_date:
-            best_timex = doc.Markables.get_DCT().m_id # assing the m_id = 0, which should be the DCT
-        return best_timex
-    else:
-        return None
-
-
-def extractSyntacticFeatures(collection):
-    res = list()
-    for doc in collection:
-        for event in doc.Markables.EVENT_MENTION:
-            event_t_id = event.get_token_anchor()[0].t_id
-            event_sentence = utils.getToken(doc, event_t_id).sentence
-            event_text = utils.getEventTextFull(doc, event)
-            
-            goldTimestamp = event.get_linkedTimestamp()
-            if goldTimestamp == 'XXXX-XX-XX': # we cannot find this timestamp in text
-                continue
-            else:
-                event_t_id = event.get_token_anchor()[0].t_id
-                timex_m_id = findGoldTIMEX3Id(doc, event, goldTimestamp)
-                if timex_m_id == None:
-                    continue
-
-            timex = utils.getTIMEX3(doc, timex_m_id)
-            timex_t_id = timex.get_token_anchor()[-1].t_id # use the last token of the entity trigger
-            timex_sentence = utils.getToken(doc, timex_t_id).sentence
-            timex_text = utils.getTIMEX3Text(doc, timex)
-            
-            wanted_sentence = event_sentence 
-            try:
-                deps = doc.root[0][0][wanted_sentence][2] # NB: note the indexing! The title is a separate sentence in CAT but it's merged into 1st sentence in Stanford NLP parse.
-            except IndexError:
-                pass
-
-            for dep in deps:
-                if event_text.split('_').count(dep[0].text.lower()) and timex_text.split(' ').count(dep[1].text):
-                    #print event_text + ',' + timex_text + ',' + dep.values()[0]
-                    if res.count(dep.values()[0]) == 0:
-                        res.append(dep.values()[0])
-    #print res
-    return res
-
-
-
-def structuredPredictionTraining(collection_train_list, syntactic_features):
-    '''Takes a collection that has been annotated with the gold timeline. Returns a classifier for the event-timex3 links.'''
-    # initiate the weights vector
-    w = np.zeros(510)
-    wa = np.zeros(510)
-    c = 1.0
-    lrate = 1
-        
-    trainError = list()
-    wanted_type = ['DATE','TIME']
-    print "Training Event to TIMEX linking model ..."
-    for i in range(0,15): # number of iterations
-        print 'Structured Perceptron Iteration: ', i
-        lrate = 0.8*lrate
-        # do the prep
-        # TBD: speed this up by saving
-        for tup in collection_train_list:
-            (collection, targetEntityList) = tup
-            #random.shuffle(collection)
-            for doc in collection:
-                for targetEntity in targetEntityList:
-                    #print doc.get_doc_id(), targetEntity
-                    
-                    # get the list of all TIMEX m_id's
-                    allTimex = [None] # allow for a possibility of not matching with an actual timex 
-                    for t in doc.Markables.TIMEX3:
-                        if wanted_type.count(t.get_type()):
-                            allTimex.append(t.m_id)
-                    
-                    # get lists of linked events and timex
-                    linkedEvents = list()
-                    linkedTimex = list()
-                    for event in doc.Markables.EVENT_MENTION:
-                        if event.get_linkedEntityName() == targetEntity:
-                            goldTimestamp = event.get_linkedTimestamp()
-                            if goldTimestamp == 'XXXX-XX-XX': # we also train on instances that have an undefined timestamp
-                                #continue
-                                linkedEvents.append(event)
-                                linkedTimex.append(None)
-                            else:
-                                idGold = findGoldTIMEX3Id(doc, event, goldTimestamp)
-                                if not idGold == None:  # only if we can find this timestamp in text
-                                    linkedEvents.append(event)
-                                    linkedTimex.append(idGold)
-
-
-                    # for each document we have:
-                    # - a list of events in linkedEvents
-                    # - a corresponding list (training set) of linked timex m_id in linkedTimex
-                    # - a list of all timex in allTimex
-                    # - getLinkFeatures(doc, event, m_id, syntactic_features) will get the features for every event-timex pair
-                    # - getGlobalFeatures(doc, (prev_event, t0), (event, t1)) will get the features for consecutive event-timex pairs
-                    # - argmaxEventTIMEX(doc, event, allTimex, w)
-                    
-                    # precompute features
-                    local_feat_dict = dict()
-                    for event in linkedEvents:
-                        for timex in allTimex:
-                            local_feat_dict[(event, timex)] = getLinkFeatures(doc, event, timex, syntactic_features)
-                            
-                    global_feat_dict = dict()
-                    for e in range(1, len(linkedEvents)):
-                        prev_event = linkedEvents[e-1]
-                        event = linkedEvents[e]
-                        for t0 in allTimex:
-                            for t1 in allTimex:
-                                global_feat_dict[((prev_event, t0),(event, t1))] = getGlobalFeatures(doc, (prev_event, t0), (event, t1))
-                    
-                    if len(linkedEvents) and len(allTimex):
-                        (linkedTimex_pred, pred) = argmaxEventTIMEX(doc, linkedEvents, allTimex, w, local_feat_dict, global_feat_dict)
-                                                
-                        if not tuple(linkedTimex) == linkedTimex_pred:
-                            w = w + (getPHI(doc, linkedEvents, linkedTimex, local_feat_dict, global_feat_dict) - getPHI(doc, linkedEvents, linkedTimex_pred, local_feat_dict, global_feat_dict))
-                        wa = wa + w
-                        c += 1
-    return wa/c
-
-def getPHI(doc, listEvents, listTimex, local_feat_dict, global_feat_dict):
-    PHI = np.zeros(500)
-    
-    # local features
-    for event, timex in zip(listEvents, listTimex):
-        PHI += local_feat_dict[(event, timex)]
-        
-    # global features
-    PHI2 = np.zeros(10)
-    for ind in range(1, len(listEvents)):
-        prev_event = listEvents[ind-1]
-        prev_timex = listTimex[ind-1]
-        event = listEvents[ind]
-        timex = listTimex[ind]
-        PHI2 += global_feat_dict[((prev_event, prev_timex),(event, timex))]
-        
-    return np.append(PHI, PHI2)
-
-def structuredPrediction(w, doc, listEvents, syntactic_features):
-    '''Given the weights from the structured perceptron predict the TIMEX3 associated with the Event'''
-    # get timex list
-    timexList = [None] # allow for a possibility of no match
-    wanted_type = ['DATE', 'TIME']
-    for timex in doc.Markables.TIMEX3:
-        if wanted_type.count(timex.get_type()):
-            #if not utils.getTIMEX3Stamp(doc, timex.m_id) == 'XXXX-XX-XX': # TBD: is this right?
-            timexList.append(timex.m_id)
-            
-    # precompute features
-    local_feat_dict = dict()
-    for event in listEvents:
-        for timex in timexList:
-            local_feat_dict[(event, timex)] = getLinkFeatures(doc, event, timex, syntactic_features)
-    
-    global_feat_dict = dict()
-    for e in range(1, len(listEvents)):
-        prev_event = listEvents[e-1]
-        event = listEvents[e]
-        for t0 in timexList:
-            for t1 in timexList:
-                global_feat_dict[((prev_event, t0),(event, t1))] = getGlobalFeatures(doc, (prev_event, t0), (event, t1))
-    
-    (best_seq, best_pred) = argmaxEventTIMEX(doc, listEvents, timexList, w, local_feat_dict, global_feat_dict)
-
-    return best_seq
-
-def linkEventTIMEX3SP(w, doc, eventMIdList, syntactic_features):
-    res = list()
-    listEvents = list()
-    
-    if len(eventMIdList):
-        for event_m_id in eventMIdList:
-            listEvents.append(utils.getEvent(doc, event_m_id))
-        
-        predictedTIMEX_list = structuredPrediction(w, doc, listEvents, syntactic_features)
-            
-        for i in range(0, len(eventMIdList)):
-            res.append((eventMIdList[i], predictedTIMEX_list[i]))
-
-    return res
-    
-def getGEN(len_events, allTimex):
-    return list(itertools.product(allTimex, repeat=len_events))
-
-def argmaxEventTIMEX(doc, linkedEvents, allTimex, w, local_feat_dict, global_feat_dict):
-    '''Find the argmax'''
-    ew = w[0:500]
-    tw = w[500:510]
-    hmm = hmmClass(allTimex, global_feat_dict, local_feat_dict, tw, ew)
-    
-    thisViterbi = Viterbi(hmm, linkedEvents)
-    best_seq = thisViterbi.return_max()
-    
-    return (best_seq, 0)
-
 def getGlobalFeatures(doc, t0, t1):
     '''t0 and t1 are adjacent hidden variables in a HMM representing a (event, timex) tuple.'''
     features = np.zeros(10)
@@ -545,18 +545,4 @@ def getGlobalFeatures(doc, t0, t1):
     ind += 1
 
     return features
-
-class Features:
-    def __init__(self):
-        self.w = np.array([])
-        self.featTxt = list()
-
-    def add(self,val,txt):
-        self.w = np.append(self.w, [val])
-        self.featTxt.append(txt)
-        
-
-
-
-
-
+    

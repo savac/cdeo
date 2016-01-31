@@ -66,7 +66,7 @@ def trainEventEntityClassifier(collection_train_list, syntactic_features):
 
                 wanted_list = targetEntityList
                 for targetEntity in wanted_list:
-                    thisEntityFeatureList = getLinkFeatures(doc, event, targetEntity, syntactic_features)
+                    thisEntityFeatureList = getLocalFeatures(doc, event, targetEntity, syntactic_features)
                     featuresList += thisEntityFeatureList
                     if event.get_linkedEntityName() == targetEntity: # true label
                         labelsList += [1]*len(thisEntityFeatureList)
@@ -106,7 +106,7 @@ def predictEventEntityLink(clf, doc, event, targetEntityList, syntactic_features
     features = list()
     labels = list()
     for targetEntity in targetEntityList:
-        thisEntityFeatures = getLinkFeatures(doc, event, targetEntity, syntactic_features)
+        thisEntityFeatures = getLocalFeatures(doc, event, targetEntity, syntactic_features)
         features += thisEntityFeatures
         labels += [targetEntity]*len(thisEntityFeatures)
     if len(features) > 0:
@@ -130,9 +130,169 @@ def predictEventEntityLink(clf, doc, event, targetEntityList, syntactic_features
         return res
     else:
         return ['unknown'] # we could not exctract any features
-        
     
-def getLinkFeatures(doc, event, targetEntity, syntactic_features):
+def extractSyntacticFeatures(collection):
+    res = list()
+    for doc in collection:
+        for event in doc.Markables.EVENT_MENTION:
+            event_t_id = event.get_token_anchor()[0].t_id
+            event_sentence = utils.getToken(doc, event_t_id).sentence
+            event_text = utils.getEventTextFull(doc, event)
+            for entity in doc.Markables.ENTITY_MENTION: 
+                entity_t_id = entity.get_token_anchor()[-1].t_id # use the last token of the entity trigger
+                entity_sentence = utils.getToken(doc, entity_t_id).sentence
+                entity_text = utils.getEntityText(doc, entity)
+                if entity.get_type() == event.get_linkedEntityName() and event_sentence == entity_sentence: # only for gold event-entity links
+
+                    wanted_sentence = event_sentence
+                    try:
+                        deps = doc.root[0][0][wanted_sentence][2] # NB: note the indexing! The title is a separate sentence in CAT but it's merged into 1st sentence in Stanford NLP parse.
+                    except IndexError:
+                        pass
+
+                    for dep in deps:
+                        if event_text.split('_').count(dep[0].text.lower()) and entity_text.split(' ').count(dep[1].text):
+                            if res.count(dep.values()[0]) == 0:
+                                res.append(dep.values()[0])
+    #print res
+    return res
+
+def structuredPredictionTraining(collection_train_list, syntactic_features):
+    '''Takes a collection that has been annotated with the gold timeline. Returns a classifier for the event-timex3 links.'''
+    # initiate the weights vector
+    w = np.zeros(510)
+    wa = np.zeros(510)
+    c = 1.0
+    lrate = 1
+        
+    trainError = list()
+    wanted_type = ['DATE','TIME']
+    print "Training Event to Entity linking model ..."
+    for i in range(15): # number of iterations
+        print 'Structured Perceptron Iteration: ', i
+        lrate = 0.95*lrate
+        # do the prep
+        for tup in collection_train_list:
+            (collection, targetEntityList) = tup
+            targetEntityList += [None]
+            random.shuffle(collection)
+            for doc in collection:
+
+                # get lists of linked events and entities
+                linkedEvents = list()
+                linkedEntities = list()
+                for event in doc.Markables.EVENT_MENTION:
+                    goldEntity = event.get_linkedEntityName()
+                    if goldEntity == None: # Assume there are event mentions in the text that do not appear on the gold timeline
+                        linkedEvents.append(event)
+                        linkedEntities.append(None)
+                    else:
+                        linkedEvents.append(event)
+                        linkedEntities.append(goldEntity)
+
+                # for each document we have:
+                # - a list of events in linkedEvents
+                # - a corresponding list (training set) of linked timex m_id in linkedTimex
+                # - a list of all timex in allTimex
+                # - getLocalFeatures(doc, event, m_id, syntactic_features) will get the features for every event-timex pair
+                # - getGlobalFeatures(doc, (prev_event, t0), (event, t1)) will get the features for consecutive event-timex pairs
+                # - argmaxEventTIMEX(doc, event, allTimex, w)
+                
+                # precompute features
+                local_feat_dict = dict()
+                for event in linkedEvents:
+                    for entity in targetEntityList:
+                        local_feat_dict[(event, entity)] = getLocalFeatures(doc, event, entity, syntactic_features)
+                        
+                global_feat_dict = dict()
+                for e in range(1, len(linkedEvents)):
+                    prev_event = linkedEvents[e-1]
+                    event = linkedEvents[e]
+                    for e0 in targetEntityList:
+                        for e1 in targetEntityList:
+                            global_feat_dict[((prev_event, e0),(event, e1))] = getGlobalFeatures(doc, (prev_event, e0), (event, e1))
+                
+                if len(linkedEvents) and len(targetEntityList):
+                    (linkedEntities_pred, pred) = argmaxEventEntity(doc, linkedEvents, targetEntityList, w, local_feat_dict, global_feat_dict)
+                    #print linkedEntities, linkedEntities_pred
+                                            
+                    if not tuple(linkedEntities) == linkedEntities_pred:
+                        w = w + (getPHI(doc, linkedEvents, linkedEntities, local_feat_dict, global_feat_dict) - getPHI(doc, linkedEvents, linkedEntities_pred, local_feat_dict, global_feat_dict))
+                    wa = wa + w
+                    c += 1
+    return wa/c
+
+def getPHI(doc, listEvents, listTimex, local_feat_dict, global_feat_dict):
+    PHI = np.zeros(500)
+    
+    # local features
+    for event, timex in zip(listEvents, listTimex):
+        PHI += local_feat_dict[(event, timex)]
+        
+    # global features
+    PHI2 = np.zeros(10)
+    for ind in range(1, len(listEvents)):
+        prev_event = listEvents[ind-1]
+        prev_timex = listTimex[ind-1]
+        event = listEvents[ind]
+        timex = listTimex[ind]
+        PHI2 += global_feat_dict[((prev_event, prev_timex),(event, timex))]
+        
+    return np.append(PHI, PHI2)
+
+def structuredPrediction(w, doc, listEvents, targetEntityList, syntactic_features):
+    '''Given the weights from the structured perceptron predict the target entity associated with the Event'''
+    # NB: Note that we ordered the events when we read in the corpus.
+            
+    # precompute features
+    local_feat_dict = dict()
+    for event in listEvents:
+        for entity in targetEntityList:
+            local_feat_dict[(event, entity)] = getLocalFeatures(doc, event, entity, syntactic_features)
+            
+    global_feat_dict = dict()
+    for e in range(1, len(listEvents)):
+        prev_event = listEvents[e-1]
+        event = listEvents[e]
+        for e0 in targetEntityList:
+            for e1 in targetEntityList:
+                global_feat_dict[((prev_event, e0),(event, e1))] = getGlobalFeatures(doc, (prev_event, e0), (event, e1))
+    
+    #(best_timex, predicted_prob) = argmaxEventTIMEX(doc, event, timexList, w, syntactic_features)
+    (best_seq, best_pred) = argmaxEventEntity(doc, listEvents, targetEntityList, w, local_feat_dict, global_feat_dict)
+
+    return best_seq
+
+def linkEventEntitySP(w, doc, targetEntityList, syntactic_features):
+    res = dict()
+    for targetEntity in targetEntityList:
+        res[targetEntity] = []
+    
+    if len(targetEntityList):
+        listEvents = doc.Markables.EVENT_MENTION
+            
+        predictedEntity_list = structuredPrediction(w, doc, listEvents, targetEntityList, syntactic_features)
+        
+        #print len(listEvents), len(predictedEntity_list)
+        #print listEvents, predictedEntity_list
+        
+        for i in range(len(predictedEntity_list)):
+            res[predictedEntity_list[i]].append(listEvents[i].m_id)
+        
+    return res
+
+def argmaxEventEntity(doc, linkedEvents, targetEntityList, w, local_feat_dict, global_feat_dict):
+    '''Find the argmax'''
+    ew = w[0:500]
+    tw = w[500:510]
+    hmm = hmmClass(targetEntityList, global_feat_dict, local_feat_dict, tw, ew)
+        
+    thisViterbi = Viterbi(hmm, linkedEvents)
+    best_seq = thisViterbi.return_max()
+    
+    return (best_seq, 0)
+
+def getLocalFeatures(doc, event, targetEntity, syntactic_features):
     '''Get a list of feature vectors for the event and the target entity only if they are in the same sentence. Return an empty list otherwise.'''
     sentence_flag = False
     #features_init = np.zeros(500) # features
@@ -210,167 +370,6 @@ def getLinkFeatures(doc, event, targetEntity, syntactic_features):
                 #ind += len(syntactic_features)
                 
     return features
-    
-def extractSyntacticFeatures(collection):
-    res = list()
-    for doc in collection:
-        for event in doc.Markables.EVENT_MENTION:
-            event_t_id = event.get_token_anchor()[0].t_id
-            event_sentence = utils.getToken(doc, event_t_id).sentence
-            event_text = utils.getEventTextFull(doc, event)
-            for entity in doc.Markables.ENTITY_MENTION: 
-                entity_t_id = entity.get_token_anchor()[-1].t_id # use the last token of the entity trigger
-                entity_sentence = utils.getToken(doc, entity_t_id).sentence
-                entity_text = utils.getEntityText(doc, entity)
-                if entity.get_type() == event.get_linkedEntityName() and event_sentence == entity_sentence: # only for gold event-entity links
-
-                    wanted_sentence = event_sentence
-                    try:
-                        deps = doc.root[0][0][wanted_sentence][2] # NB: note the indexing! The title is a separate sentence in CAT but it's merged into 1st sentence in Stanford NLP parse.
-                    except IndexError:
-                        pass
-
-                    for dep in deps:
-                        if event_text.split('_').count(dep[0].text.lower()) and entity_text.split(' ').count(dep[1].text):
-                            if res.count(dep.values()[0]) == 0:
-                                res.append(dep.values()[0])
-    #print res
-    return res
-
-def structuredPredictionTraining(collection_train_list, syntactic_features):
-    '''Takes a collection that has been annotated with the gold timeline. Returns a classifier for the event-timex3 links.'''
-    # initiate the weights vector
-    w = np.zeros(510)
-    wa = np.zeros(510)
-    c = 1.0
-    lrate = 1
-        
-    trainError = list()
-    wanted_type = ['DATE','TIME']
-    print "Training Event to Entity linking model ..."
-    for i in range(15): # number of iterations
-        print 'Structured Perceptron Iteration: ', i
-        lrate = 0.95*lrate
-        # do the prep
-        for tup in collection_train_list:
-            (collection, targetEntityList) = tup
-            targetEntityList += [None]
-            random.shuffle(collection)
-            for doc in collection:
-
-                # get lists of linked events and entities
-                linkedEvents = list()
-                linkedEntities = list()
-                for event in doc.Markables.EVENT_MENTION:
-                    goldEntity = event.get_linkedEntityName()
-                    if goldEntity == None: # Assume there are event mentions in the text that do not appear on the gold timeline
-                        linkedEvents.append(event)
-                        linkedEntities.append(None)
-                    else:
-                        linkedEvents.append(event)
-                        linkedEntities.append(goldEntity)
-
-                # for each document we have:
-                # - a list of events in linkedEvents
-                # - a corresponding list (training set) of linked timex m_id in linkedTimex
-                # - a list of all timex in allTimex
-                # - getLinkFeatures(doc, event, m_id, syntactic_features) will get the features for every event-timex pair
-                # - getGlobalFeatures(doc, (prev_event, t0), (event, t1)) will get the features for consecutive event-timex pairs
-                # - argmaxEventTIMEX(doc, event, allTimex, w)
-                
-                # precompute features
-                local_feat_dict = dict()
-                for event in linkedEvents:
-                    for entity in targetEntityList:
-                        local_feat_dict[(event, entity)] = getLinkFeatures(doc, event, entity, syntactic_features)
-                        
-                global_feat_dict = dict()
-                for e in range(1, len(linkedEvents)):
-                    prev_event = linkedEvents[e-1]
-                    event = linkedEvents[e]
-                    for e0 in targetEntityList:
-                        for e1 in targetEntityList:
-                            global_feat_dict[((prev_event, e0),(event, e1))] = getGlobalFeatures(doc, (prev_event, e0), (event, e1))
-                
-                if len(linkedEvents) and len(targetEntityList):
-                    (linkedEntities_pred, pred) = argmaxEventEntity(doc, linkedEvents, targetEntityList, w, local_feat_dict, global_feat_dict)
-                    #print linkedEntities, linkedEntities_pred
-                                            
-                    if not tuple(linkedEntities) == linkedEntities_pred:
-                        w = w + (getPHI(doc, linkedEvents, linkedEntities, local_feat_dict, global_feat_dict) - getPHI(doc, linkedEvents, linkedEntities_pred, local_feat_dict, global_feat_dict))
-                    wa = wa + w
-                    c += 1
-    return wa/c
-
-def getPHI(doc, listEvents, listTimex, local_feat_dict, global_feat_dict):
-    PHI = np.zeros(500)
-    
-    # local features
-    for event, timex in zip(listEvents, listTimex):
-        PHI += local_feat_dict[(event, timex)]
-        
-    # global features
-    PHI2 = np.zeros(10)
-    for ind in range(1, len(listEvents)):
-        prev_event = listEvents[ind-1]
-        prev_timex = listTimex[ind-1]
-        event = listEvents[ind]
-        timex = listTimex[ind]
-        PHI2 += global_feat_dict[((prev_event, prev_timex),(event, timex))]
-        
-    return np.append(PHI, PHI2)
-
-def structuredPrediction(w, doc, listEvents, targetEntityList, syntactic_features):
-    '''Given the weights from the structured perceptron predict the target entity associated with the Event'''
-    # NB: Note that we ordered the events when we read in the corpus.
-            
-    # precompute features
-    local_feat_dict = dict()
-    for event in listEvents:
-        for entity in targetEntityList:
-            local_feat_dict[(event, entity)] = getLinkFeatures(doc, event, entity, syntactic_features)
-            
-    global_feat_dict = dict()
-    for e in range(1, len(listEvents)):
-        prev_event = listEvents[e-1]
-        event = listEvents[e]
-        for e0 in targetEntityList:
-            for e1 in targetEntityList:
-                global_feat_dict[((prev_event, e0),(event, e1))] = getGlobalFeatures(doc, (prev_event, e0), (event, e1))
-    
-    #(best_timex, predicted_prob) = argmaxEventTIMEX(doc, event, timexList, w, syntactic_features)
-    (best_seq, best_pred) = argmaxEventEntity(doc, listEvents, targetEntityList, w, local_feat_dict, global_feat_dict)
-
-    return best_seq
-
-def linkEventEntitySP(w, doc, targetEntityList, syntactic_features):
-    res = dict()
-    for targetEntity in targetEntityList:
-        res[targetEntity] = []
-    
-    if len(targetEntityList):
-        listEvents = doc.Markables.EVENT_MENTION
-            
-        predictedEntity_list = structuredPrediction(w, doc, listEvents, targetEntityList, syntactic_features)
-        
-        #print len(listEvents), len(predictedEntity_list)
-        #print listEvents, predictedEntity_list
-        
-        for i in range(len(predictedEntity_list)):
-            res[predictedEntity_list[i]].append(listEvents[i].m_id)
-        
-    return res
-
-def argmaxEventEntity(doc, linkedEvents, targetEntityList, w, local_feat_dict, global_feat_dict):
-    '''Find the argmax'''
-    ew = w[0:500]
-    tw = w[500:510]
-    hmm = hmmClass(targetEntityList, global_feat_dict, local_feat_dict, tw, ew)
-        
-    thisViterbi = Viterbi(hmm, linkedEvents)
-    best_seq = thisViterbi.return_max()
-    
-    return (best_seq, 0)
 
 def getGlobalFeatures(doc, t0, t1):
     '''t0 and t1 are adjacent hidden variables in a HMM representing a (event, timex) tuple.'''
