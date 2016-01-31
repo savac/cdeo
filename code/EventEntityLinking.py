@@ -63,15 +63,14 @@ def trainEventEntityClassifier(collection_train_list, syntactic_features):
         (collection, targetEntityList) = tup
         for doc in collection:
             for event in doc.Markables.EVENT_MENTION:
-
-                wanted_list = targetEntityList
-                for targetEntity in wanted_list:
+                for targetEntity in targetEntityList:
                     thisEntityFeatureList = getLocalFeatures(doc, event, targetEntity, syntactic_features)
-                    featuresList += thisEntityFeatureList
-                    if event.get_linkedEntityName() == targetEntity: # true label
-                        labelsList += [1]*len(thisEntityFeatureList)
-                    else:                                            # false label
-                        labelsList += [0]*len(thisEntityFeatureList)
+                    if np.sum(thisEntityFeatureList)>0: # only train (and predict) on the entities from the same sentence
+                        featuresList += [thisEntityFeatureList]
+                        if event.get_linkedEntityName() == targetEntity: # true label
+                            labelsList += [1]
+                        else:                                            # false label
+                            labelsList += [0]
 
     '''
     decision_function(X)	Predict confidence scores for samples.
@@ -107,8 +106,9 @@ def predictEventEntityLink(clf, doc, event, targetEntityList, syntactic_features
     labels = list()
     for targetEntity in targetEntityList:
         thisEntityFeatures = getLocalFeatures(doc, event, targetEntity, syntactic_features)
-        features += thisEntityFeatures
-        labels += [targetEntity]*len(thisEntityFeatures)
+        if np.sum(thisEntityFeatures)>0:
+            features += [thisEntityFeatures]
+            labels += [targetEntity]
     if len(features) > 0:
         predicted_prob = clf.predict_proba(features)
         predicted_prob = [x[1] for x in predicted_prob] # get the '1' label in the 2nd column
@@ -175,7 +175,7 @@ def structuredPredictionTraining(collection_train_list, syntactic_features):
         for tup in collection_train_list:
             (collection, targetEntityList) = tup
             targetEntityList += [None]
-            random.shuffle(collection)
+            #random.shuffle(collection)
             for doc in collection:
 
                 # get lists of linked events and entities
@@ -368,8 +368,116 @@ def getLocalFeatures(doc, event, targetEntity, syntactic_features):
                                     #print  str(ind+i) + ': [' + targetEntity + ']', dep[1].text, dep[0].text, ':' + syntactic_features[i], event_sentence, doc.get_doc_id()
                                     features[ind+i] = 1  
                 #ind += len(syntactic_features)
-                
+    
+    #if np.sum(features) > 0 :
+    #    return features
+    #else:
+    #    return None
     return features
+
+def getLocalFeaturesLegacy(doc, event, targetEntity, syntactic_features):
+    '''Get a list of feature vectors for the event and the target entity only if they are in the same sentence. Return an empty list otherwise.'''
+    sentence_flag = False
+    features_init = np.array([0]*300) # features
+    
+    event_t_id = event.get_token_anchor()[0].t_id
+    event_sentence = utils.getToken(doc, event_t_id).sentence
+    for en in doc.Markables.ENTITY_MENTION:
+        if en.get_type() == targetEntity: 
+            
+            entity_t_id = en.get_token_anchor()[0].t_id # use the first token of the entity trigger
+            entity_sentence = utils.getToken(doc, entity_t_id).sentence
+            entity_text = utils.getEntityText(doc, en)
+            
+            if event_sentence == entity_sentence: # only consider the entities in the same sentence as the event
+                if not sentence_flag:
+                    features = features_init
+                    sentence_flag = True
+                
+                # relative distance: 101 features
+                d = event_t_id - entity_t_id
+                d = d if d < 50 else 50
+                d = d if d > -50 else -50
+                features[d+50] = 1
+                ind = 101
+            
+                # bins of 5 unit distance: 11 features
+                thisBin = int(np.fix(abs(d/5.0)))
+                features[ind+thisBin] = 1
+                ind += 11
+            
+                # bins of 5 unit distance: 21 features
+                thisBin = int(np.fix(d/5.0)) + 10
+                features[ind+thisBin] = 1
+                ind += 21
+            
+                # bins of 10 unit distance: 11 features
+                thisBin = int(np.fix(d/10.0)) + 5
+                features[ind+thisBin] = 1
+                ind += 11
+            
+                # average absolute distance: 1 feature
+                val = abs(event_t_id - entity_t_id)
+                mean_old = features[ind]
+                k = np.sum(features[0:101]) 
+                features[ind] = mean_old + (val - mean_old)*1.0/k
+                ind += 1
+
+                # average squared absolute distance: 1 feature
+                val = abs(event_t_id - entity_t_id) ** 2
+                mean_old = features[ind]
+                k = np.sum(features[0:101]) 
+                features[ind] = mean_old + (val - mean_old)*1.0/k
+                ind += 1
+
+                # average signed distance: 1 feature
+                val = event_t_id - entity_t_id
+                mean_old = features[ind]
+                k = np.sum(features[0:101]) 
+                #features[ind] = mean_old + (val - mean_old)*1.0/k
+                ind += 1
+
+                # distance from closest entity
+                dist_min = 50
+                for i in range(0, 101):
+                    if features[i] and abs(i - 50) < dist_min:
+                        dist_min = abs(i - 50)
+                features[ind] = dist_min
+                ind += 1
+                
+                # if mentioned before the event
+                if entity_t_id < event_t_id:
+                    features[ind] = 1
+                ind += 1
+
+                # syntactic dependencies
+                '''
+                <dep type="nsubj">
+                  <governor idx="2">unveils</governor>
+                  <dependent idx="1">Apple</dependent>
+                </dep>
+                <dep type="dobj">
+                  <governor idx="2">unveils</governor>
+                  <dependent idx="3">iPhone</dependent>
+                </dep>
+                '''
+            
+                #try:
+                wanted_sentence = event_sentence
+                deps = doc.root[0][0][wanted_sentence][2] # NB: note the indexing! The title is a separate sentence in CAT but it's merged into 1st sentence in Stanford NLP parse.
+
+                for dep in deps:
+                    if utils.getEventTextFull(doc, event).split('_').count(dep[0].text.lower()) and entity_text.split(' ').count(dep[1].text):
+                        for i in range(0, len(syntactic_features)):
+                            if dep.values()[0] == syntactic_features[i]:
+                                #print  '[' + targetEntity + ']', dep[1].text, dep[0].text, ':' + syntactic_features[i], event_sentence, doc.get_doc_id()
+                                features[ind+i] = 1  
+                ind += 2
+    if sentence_flag:
+        #features[0:101] = 0 # masking features
+        return features
+    else:
+        return None
 
 def getGlobalFeatures(doc, t0, t1):
     '''t0 and t1 are adjacent hidden variables in a HMM representing a (event, timex) tuple.'''

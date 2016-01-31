@@ -151,8 +151,14 @@ def evaluateEventTIMEX3Linking(timeline, corpus, collection):
     sys.stdout.write(('%-30s\t%3.9f\t%3.9f\t%3.9f\n' %('Total', recall, precision, f1) )) 
 
 
-def run(test_corpus_list = [1], train_corpus_list = [0]):
-    ''' Run all the steps of timeline extraction:
+def run(test_corpus_list = [1], train_corpus_list = [0], ee_link_model='seq', et_link_model='seq'):
+    ''' 
+    Inputs 
+    test_corpus_list - list of index numbers for the test corpora ( Apple corpus (corpus 0) and test on the Airbus (corpus 1), GM (corpus 2) and Stock Markets (corpus 3) )
+    train_corpus_list - as above for training
+    ee_link_model - Event to Entity linking model type. valid options are 'maxent' (MaxEnt model) and 'seq' (Sequence model)
+    et_link_model - Event to Timestamp
+    This scripts runs all the steps of timeline extraction:
     1. Extract timestamps
     2. Extract target entities
     3. Link events to target entities
@@ -174,10 +180,16 @@ def run(test_corpus_list = [1], train_corpus_list = [0]):
         timex_syntactic_features += EventTIMEX3Linking.extractSyntacticFeatures(collection_train)
 
     # Train the link classifiers
-    #clfEntity = EventEntityLinking.trainEventEntityClassifier(collection_train_list, entity_syntactic_features)    
-    #clfTIMEX3 = EventTIMEX3Linking.trainEventTIMEX3Classifier(collection_train_list, timex_syntactic_features)
-    w_ee = EventEntityLinking.structuredPredictionTraining(collection_train_list, entity_syntactic_features)   
-    w = EventTIMEX3Linking.structuredPredictionTraining(collection_train_list, timex_syntactic_features)
+    if ee_link_model == 'maxent':
+        clfEntity = EventEntityLinking.trainEventEntityClassifier(collection_train_list, entity_syntactic_features)  
+    elif ee_link_model == 'seq':
+        w_ee = EventEntityLinking.structuredPredictionTraining(collection_train_list, entity_syntactic_features)   
+        
+    if et_link_model == 'maxent':
+        clfTIMEX3 = EventTIMEX3Linking.trainEventTIMEX3Classifier(collection_train_list, timex_syntactic_features)
+    elif et_link_model == 'seq':
+        w = EventTIMEX3Linking.structuredPredictionTraining(collection_train_list, timex_syntactic_features)
+
     #print w_ee
     #print w
 
@@ -192,20 +204,22 @@ def run(test_corpus_list = [1], train_corpus_list = [0]):
         # Keys are target entities.
         # Values are lists of tuples (doc_id, event_m_id, timex3_m_id, date)
         for doc in collection:
-            #dictEventEntity = EventEntityLinking.linkEventEntityML(clfEntity, doc, targetEntityList, entity_syntactic_features)
-            dictEventEntity = EventEntityLinking.linkEventEntitySP(w_ee, doc, targetEntityList, entity_syntactic_features)
+            if ee_link_model == 'maxent':
+                dictEventEntity = EventEntityLinking.linkEventEntityML(clfEntity, doc, targetEntityList, entity_syntactic_features)
+            elif ee_link_model == 'seq':
+                dictEventEntity = EventEntityLinking.linkEventEntitySP(w_ee, doc, targetEntityList, entity_syntactic_features)
             
             for targetEntity in targetEntityList:
-                #link target entity and events
+                # legacy role based
                 #listEventEntity = EventEntityLinking.linkEventEntityRuleBased(doc, targetEntity) # returns list of event m_id's
-                listEventEntity = dictEventEntity[targetEntity]
-                #print targetEntity, listEventEntity
-                
-                # link events to timestamps
                 #listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3(doc, listEventEntity)
-                #print doc.get_doc_id(), targetEntity, listEventEntity
-                listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3SP(w, doc, listEventEntity, timex_syntactic_features)
-                #listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3ML(clfTIMEX3, doc, listEventEntity, timex_syntactic_features)
+
+                listEventEntity = dictEventEntity[targetEntity]
+                
+                if et_link_model == 'maxent':
+                    listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3ML(clfTIMEX3, doc, listEventEntity, timex_syntactic_features)
+                elif et_link_model == 'seq':
+                    listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3SP(w, doc, listEventEntity, timex_syntactic_features)
                 
                 if not timeline.has_key(targetEntity):
                     timeline[targetEntity] = list()
