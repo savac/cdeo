@@ -25,6 +25,10 @@ To train on the Apple corpus (corpus 0) and test on the Airbus (corpus 1), GM (c
 
 ```python -c "import cdeo; cdeo.run(test_corpus_list=[1,2,3], train_corpus_list=[0])"```
 
+To use the MaxEnt model for the Event to Entity linking run
+
+```cdeo.run(test_corpus_list=[1,2,3], train_corpus_list=[0], ee_link_model='maxent', et_link_model='seq')```
+
 ##### Results
 |  | Airbus|GM|Stock|  |Total|  |
 | --- | --- | --- | --- | --- | --- | --- |
