@@ -208,7 +208,6 @@ def run(test_corpus_list = [1], train_corpus_list = [0], ee_link_model='seq', et
                 dictEventEntity = EventEntityLinking.linkEventEntityML(clfEntity, doc, targetEntityList, entity_syntactic_features)
             elif ee_link_model == 'seq':
                 dictEventEntity = EventEntityLinking.linkEventEntitySP(w_ee, doc, targetEntityList, entity_syntactic_features)
-            
             for targetEntity in targetEntityList:
                 # legacy role based
                 #listEventEntity = EventEntityLinking.linkEventEntityRuleBased(doc, targetEntity) # returns list of event m_id's

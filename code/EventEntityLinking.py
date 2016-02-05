@@ -174,7 +174,7 @@ def structuredPredictionTraining(collection_train_list, syntactic_features):
         # do the prep
         for tup in collection_train_list:
             (collection, targetEntityList) = tup
-            targetEntityList += [None]
+            allEntities = copy.deepcopy(targetEntityList) + [None]
             #random.shuffle(collection)
             for doc in collection:
 
@@ -201,19 +201,19 @@ def structuredPredictionTraining(collection_train_list, syntactic_features):
                 # precompute features
                 local_feat_dict = dict()
                 for event in linkedEvents:
-                    for entity in targetEntityList:
+                    for entity in allEntities:
                         local_feat_dict[(event, entity)] = getLocalFeatures(doc, event, entity, syntactic_features)
                         
                 global_feat_dict = dict()
                 for e in range(1, len(linkedEvents)):
                     prev_event = linkedEvents[e-1]
                     event = linkedEvents[e]
-                    for e0 in targetEntityList:
-                        for e1 in targetEntityList:
+                    for e0 in allEntities:
+                        for e1 in allEntities:
                             global_feat_dict[((prev_event, e0),(event, e1))] = getGlobalFeatures(doc, (prev_event, e0), (event, e1))
                 
-                if len(linkedEvents) and len(targetEntityList):
-                    (linkedEntities_pred, pred) = argmaxEventEntity(doc, linkedEvents, targetEntityList, w, local_feat_dict, global_feat_dict)
+                if len(linkedEvents) and len(allEntities):
+                    (linkedEntities_pred, pred) = argmaxEventEntity(doc, linkedEvents, allEntities, w, local_feat_dict, global_feat_dict)
                     #print linkedEntities, linkedEntities_pred
                                             
                     if not tuple(linkedEntities) == linkedEntities_pred:
@@ -243,23 +243,25 @@ def getPHI(doc, listEvents, listTimex, local_feat_dict, global_feat_dict):
 def structuredPrediction(w, doc, listEvents, targetEntityList, syntactic_features):
     '''Given the weights from the structured perceptron predict the target entity associated with the Event'''
     # NB: Note that we ordered the events when we read in the corpus.
-            
+
+    allEntities = copy.deepcopy(targetEntityList) + [None]
+
     # precompute features
     local_feat_dict = dict()
     for event in listEvents:
-        for entity in targetEntityList:
+        for entity in allEntities:
             local_feat_dict[(event, entity)] = getLocalFeatures(doc, event, entity, syntactic_features)
             
     global_feat_dict = dict()
     for e in range(1, len(listEvents)):
         prev_event = listEvents[e-1]
         event = listEvents[e]
-        for e0 in targetEntityList:
-            for e1 in targetEntityList:
+        for e0 in allEntities:
+            for e1 in allEntities:
                 global_feat_dict[((prev_event, e0),(event, e1))] = getGlobalFeatures(doc, (prev_event, e0), (event, e1))
     
     #(best_timex, predicted_prob) = argmaxEventTIMEX(doc, event, timexList, w, syntactic_features)
-    (best_seq, best_pred) = argmaxEventEntity(doc, listEvents, targetEntityList, w, local_feat_dict, global_feat_dict)
+    (best_seq, best_pred) = argmaxEventEntity(doc, listEvents, allEntities, w, local_feat_dict, global_feat_dict)
 
     return best_seq
 
@@ -277,18 +279,64 @@ def linkEventEntitySP(w, doc, targetEntityList, syntactic_features):
         #print listEvents, predictedEntity_list
         
         for i in range(len(predictedEntity_list)):
-            res[predictedEntity_list[i]].append(listEvents[i].m_id)
-        
+            if predictedEntity_list[i] != None:
+                res[predictedEntity_list[i]].append(listEvents[i].m_id)
     return res
 
 def argmaxEventEntity(doc, linkedEvents, targetEntityList, w, local_feat_dict, global_feat_dict):
     '''Find the argmax'''
-    ew = w[0:500]
-    tw = w[500:510]
-    hmm = hmmClass(targetEntityList, global_feat_dict, local_feat_dict, tw, ew)
+    
+    if cdeo_config.getConfig("restrict_entity_linking_to_sentence_flag"):
+        # restrict the search to the entities in the same sentence as the event
         
-    thisViterbi = Viterbi(hmm, linkedEvents)
-    best_seq = thisViterbi.return_max()
+        # firstly get a list of potential candidates for each event
+        listEntitiesRestricted = []
+        for ev in linkedEvents:
+            event_t_id = ev.get_token_anchor()[0].t_id
+            event_sentence = utils.getToken(doc, event_t_id).sentence
+            this_list = []
+            for en in doc.Markables.ENTITY_MENTION:
+                entity_t_id = en.get_token_anchor()[0].t_id
+                entity_sentence = utils.getToken(doc, entity_t_id).sentence
+                if event_sentence == entity_sentence:
+                    this_list += [en.get_type()]
+            if len(this_list):
+                this_list = list(set(this_list))
+            else:
+                this_list = [None]
+            listEntitiesRestricted += [this_list]
+        #print linkedEvents
+        #print 'listEntitiesRestricted=', listEntitiesRestricted
+        
+        # get all the permutations
+        perms = list(itertools.product(*listEntitiesRestricted))
+        
+        print len(perms)
+        print listEntitiesRestricted
+        
+        if len(perms) < 1e6:
+            # brute argmax
+            best_seq = perms[0]
+            best_score = np.dot(w, getPHI(doc, linkedEvents, perms[0], local_feat_dict, global_feat_dict))
+            for p in perms[1:]:
+                this_score = np.dot(w, getPHI(doc, linkedEvents, p, local_feat_dict, global_feat_dict))
+                if this_score > best_score:
+                    best_score = this_score
+                    best_seq = p
+        else:
+            ew = w[0:500]
+            tw = w[500:510]
+            hmm = hmmClass(targetEntityList, global_feat_dict, local_feat_dict, tw, ew)
+                
+            thisViterbi = Viterbi(hmm, linkedEvents)
+            best_seq = thisViterbi.return_max()
+    else:
+        ew = w[0:500]
+        tw = w[500:510]
+        hmm = hmmClass(targetEntityList, global_feat_dict, local_feat_dict, tw, ew)
+            
+        thisViterbi = Viterbi(hmm, linkedEvents)
+        best_seq = thisViterbi.return_max()
     
     return (best_seq, 0)
 
@@ -374,110 +422,6 @@ def getLocalFeatures(doc, event, targetEntity, syntactic_features):
     #else:
     #    return None
     return features
-
-def getLocalFeaturesLegacy(doc, event, targetEntity, syntactic_features):
-    '''Get a list of feature vectors for the event and the target entity only if they are in the same sentence. Return an empty list otherwise.'''
-    sentence_flag = False
-    features_init = np.array([0]*300) # features
-    
-    event_t_id = event.get_token_anchor()[0].t_id
-    event_sentence = utils.getToken(doc, event_t_id).sentence
-    for en in doc.Markables.ENTITY_MENTION:
-        if en.get_type() == targetEntity: 
-            
-            entity_t_id = en.get_token_anchor()[0].t_id # use the first token of the entity trigger
-            entity_sentence = utils.getToken(doc, entity_t_id).sentence
-            entity_text = utils.getEntityText(doc, en)
-            
-            if event_sentence == entity_sentence: # only consider the entities in the same sentence as the event
-                if not sentence_flag:
-                    features = features_init
-                    sentence_flag = True
-                
-                # relative distance: 101 features
-                d = event_t_id - entity_t_id
-                d = d if d < 50 else 50
-                d = d if d > -50 else -50
-                features[d+50] = 1
-                ind = 101
-            
-                # bins of 5 unit distance: 11 features
-                thisBin = int(np.fix(abs(d/5.0)))
-                features[ind+thisBin] = 1
-                ind += 11
-            
-                # bins of 5 unit distance: 21 features
-                thisBin = int(np.fix(d/5.0)) + 10
-                features[ind+thisBin] = 1
-                ind += 21
-            
-                # bins of 10 unit distance: 11 features
-                thisBin = int(np.fix(d/10.0)) + 5
-                features[ind+thisBin] = 1
-                ind += 11
-            
-                # average absolute distance: 1 feature
-                val = abs(event_t_id - entity_t_id)
-                mean_old = features[ind]
-                k = np.sum(features[0:101]) 
-                features[ind] = mean_old + (val - mean_old)*1.0/k
-                ind += 1
-
-                # average squared absolute distance: 1 feature
-                val = abs(event_t_id - entity_t_id) ** 2
-                mean_old = features[ind]
-                k = np.sum(features[0:101]) 
-                features[ind] = mean_old + (val - mean_old)*1.0/k
-                ind += 1
-
-                # average signed distance: 1 feature
-                val = event_t_id - entity_t_id
-                mean_old = features[ind]
-                k = np.sum(features[0:101]) 
-                #features[ind] = mean_old + (val - mean_old)*1.0/k
-                ind += 1
-
-                # distance from closest entity
-                dist_min = 50
-                for i in range(0, 101):
-                    if features[i] and abs(i - 50) < dist_min:
-                        dist_min = abs(i - 50)
-                features[ind] = dist_min
-                ind += 1
-                
-                # if mentioned before the event
-                if entity_t_id < event_t_id:
-                    features[ind] = 1
-                ind += 1
-
-                # syntactic dependencies
-                '''
-                <dep type="nsubj">
-                  <governor idx="2">unveils</governor>
-                  <dependent idx="1">Apple</dependent>
-                </dep>
-                <dep type="dobj">
-                  <governor idx="2">unveils</governor>
-                  <dependent idx="3">iPhone</dependent>
-                </dep>
-                '''
-            
-                #try:
-                wanted_sentence = event_sentence
-                deps = doc.root[0][0][wanted_sentence][2] # NB: note the indexing! The title is a separate sentence in CAT but it's merged into 1st sentence in Stanford NLP parse.
-
-                for dep in deps:
-                    if utils.getEventTextFull(doc, event).split('_').count(dep[0].text.lower()) and entity_text.split(' ').count(dep[1].text):
-                        for i in range(0, len(syntactic_features)):
-                            if dep.values()[0] == syntactic_features[i]:
-                                #print  '[' + targetEntity + ']', dep[1].text, dep[0].text, ':' + syntactic_features[i], event_sentence, doc.get_doc_id()
-                                features[ind+i] = 1  
-                ind += 2
-    if sentence_flag:
-        #features[0:101] = 0 # masking features
-        return features
-    else:
-        return None
 
 def getGlobalFeatures(doc, t0, t1):
     '''t0 and t1 are adjacent hidden variables in a HMM representing a (event, timex) tuple.'''
