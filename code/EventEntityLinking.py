@@ -8,8 +8,10 @@ import copy
 import cdeo_config
 import itertools
 import nltk.stem.porter as porter
-from viterbi import hmmClass
-from viterbi import Viterbi
+#from viterbi import hmmClass
+#from viterbi import Viterbi
+import viterbi
+reload(viterbi)
 reload(utils)
 
 def linkEventEntityRuleBased(doc, targetEntityText):
@@ -286,11 +288,8 @@ def linkEventEntitySP(w, doc, targetEntityList, syntactic_features):
 def argmaxEventEntity(doc, linkedEvents, targetEntityList, w, local_feat_dict, global_feat_dict):
     '''Find the argmax'''
     
-    if cdeo_config.getConfig("restrict_entity_linking_to_sentence_flag"):
-        # restrict the search to the entities in the same sentence as the event
-        
-        # firstly get a list of potential candidates for each event
-        listEntitiesRestricted = []
+    if cdeo_config.getConfig('restrict_entity_linking_to_sentence_flag'):
+        listListEntities= []
         for ev in linkedEvents:
             event_t_id = ev.get_token_anchor()[0].t_id
             event_sentence = utils.getToken(doc, event_t_id).sentence
@@ -304,39 +303,16 @@ def argmaxEventEntity(doc, linkedEvents, targetEntityList, w, local_feat_dict, g
                 this_list = list(set(this_list))
             else:
                 this_list = [None]
-            listEntitiesRestricted += [this_list]
-        #print linkedEvents
-        #print 'listEntitiesRestricted=', listEntitiesRestricted
-        
-        # get all the permutations
-        perms = list(itertools.product(*listEntitiesRestricted))
-        
-        print len(perms)
-        print listEntitiesRestricted
-        
-        if len(perms) < 1e6:
-            # brute argmax
-            best_seq = perms[0]
-            best_score = np.dot(w, getPHI(doc, linkedEvents, perms[0], local_feat_dict, global_feat_dict))
-            for p in perms[1:]:
-                this_score = np.dot(w, getPHI(doc, linkedEvents, p, local_feat_dict, global_feat_dict))
-                if this_score > best_score:
-                    best_score = this_score
-                    best_seq = p
-        else:
-            ew = w[0:500]
-            tw = w[500:510]
-            hmm = hmmClass(targetEntityList, global_feat_dict, local_feat_dict, tw, ew)
-                
-            thisViterbi = Viterbi(hmm, linkedEvents)
-            best_seq = thisViterbi.return_max()
+            listListEntities += [this_list]
     else:
-        ew = w[0:500]
-        tw = w[500:510]
-        hmm = hmmClass(targetEntityList, global_feat_dict, local_feat_dict, tw, ew)
-            
-        thisViterbi = Viterbi(hmm, linkedEvents)
-        best_seq = thisViterbi.return_max()
+        listListEntities = [copy.deepcopy(targetEntityList + [None]) for i in range(len(linkedEvents))]
+
+    ew = w[0:500]
+    tw = w[500:510]
+    hmm = viterbi.hmmClass(global_feat_dict, local_feat_dict, tw, ew)
+        
+    thisViterbi = viterbi.Viterbi(hmm, linkedEvents, listListEntities)
+    best_seq = thisViterbi.return_max()
     
     return (best_seq, 0)
 

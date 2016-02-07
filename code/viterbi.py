@@ -2,8 +2,7 @@ import copy
 import numpy as np
 
 class hmmClass(object):
-    def __init__(self,labels, tProb, eProb, tw, ew):
-        self.labels = labels
+    def __init__(self, tProb, eProb, tw, ew):
         self.tProb=tProb
         self.eProb=eProb
         self.tw=tw
@@ -11,12 +10,16 @@ class hmmClass(object):
 
 class Viterbi:
     trell = []
-    def __init__(self, hmm, words):
+    def __init__(self, hmm, words, labels):
+        '''Inputs:
+        labels - a list of lists of labels with each sublist corresponding to a node
+        '''
         self.trell = []
-        temp = {}
-        for label in hmm.labels:
-           temp[label] = [0,None]
-        for word in words:
+        for iw in range(len(words)):
+            word = words[iw]
+            temp = {}
+            for label in labels[iw]:
+                temp[label] = [0,None]
             self.trell.append([word,copy.deepcopy(temp)])
         self.fill_in(hmm)
 

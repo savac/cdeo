@@ -8,8 +8,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 import itertools
 import nltk.stem.porter as porter
-from viterbi import hmmClass
-from viterbi import Viterbi
+import viterbi
+reload(viterbi)
 reload(utils)
 
 def linkEventTIMEX3(doc, eventMIdList):
@@ -322,11 +322,14 @@ def getGEN(len_events, allTimex):
 
 def argmaxEventTIMEX(doc, linkedEvents, allTimex, w, local_feat_dict, global_feat_dict):
     '''Find the argmax'''
+    
+    allTimexLists = [copy.deepcopy(allTimex) for i in range(len(linkedEvents))]
+    
     ew = w[0:500]
     tw = w[500:510]
-    hmm = hmmClass(allTimex, global_feat_dict, local_feat_dict, tw, ew)
+    hmm = viterbi.hmmClass(global_feat_dict, local_feat_dict, tw, ew)
     
-    thisViterbi = Viterbi(hmm, linkedEvents)
+    thisViterbi = viterbi.Viterbi(hmm, linkedEvents, allTimexLists)
     best_seq = thisViterbi.return_max()
     
     return (best_seq, 0)
