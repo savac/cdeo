@@ -5,6 +5,7 @@ import copy
 import random
 import numpy as np
 from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import Perceptron
 from sklearn.svm import SVC
 import itertools
 import nltk.stem.porter as porter
@@ -88,7 +89,8 @@ def trainEventTIMEX3Classifier(collection_train_list, syntactic_features):
                             labelsList.append(0)
                     
     #clf = LogisticRegression(solver='lbfgs', C=0.9, penalty='l2', tol=1e-5, class_weight='auto', fit_intercept=True)
-    clf = LogisticRegression(solver='liblinear', C=1.0, penalty='l1', tol=1e-5, class_weight='auto', fit_intercept=True)
+    #clf = LogisticRegression(solver='liblinear', C=1.0, penalty='l1', tol=1e-5, class_weight='auto', fit_intercept=True)
+    clf = Perceptron(penalty=None, alpha=0.0001, fit_intercept=True, n_iter=5, shuffle=True, verbose=0, eta0=1.0, n_jobs=1, random_state=0, class_weight=None, warm_start=False)
     #clf = SVC(probability=True, kernel='rbf', class_weight='auto', tol=1e-4)
     clf.fit(featuresList, labelsList)
 
@@ -124,6 +126,15 @@ def predictEventTIMEX3Link(clf, doc, event, syntactic_features):
         if wanted_type.count(timex.get_type()):
             features.append(getLocalFeatures(doc, event, timex.m_id, syntactic_features))
             timexList.append(timex.m_id)
+            
+    if len(features):
+        scores = clf.decision_function(features)
+        imax = np.argmax(scores) # get the highest timex with the highest confidence score
+        return timexList[imax]
+    else:
+        return None
+            
+    '''
     predicted_prob = clf.predict_proba(features)
     predicted_prob = [x[1] for x in predicted_prob] # get the '1' label in the 2nd column
     imax = np.argmax(predicted_prob)
@@ -139,7 +150,7 @@ def predictEventTIMEX3Link(clf, doc, event, syntactic_features):
         return best_timex
     else:
         return None
-
+    '''
 
 def extractSyntacticFeatures(collection):
     res = list()
@@ -363,15 +374,6 @@ def getLocalFeatures(doc, event, timex_m_id, syntactic_features):
         features[ind+d+n] = 1
     ind += 2*n+1
     
-    # bins of 1 unit token distance
-    #d = event_t_id - timex_t_id
-    #n = 30
-    #bin_size = 1.0
-    #if abs(d) <= n:
-    #    thisBin = int(np.fix(d/bin_size))
-    #    features[ind+thisBin+int(n/bin_size)] = 1
-    #ind += 2*(n/bin_size)+1    
-    
     # bins of 5 unit token distance
     d = event_t_id - timex_t_id
     n = 40
@@ -399,40 +401,12 @@ def getLocalFeatures(doc, event, timex_m_id, syntactic_features):
         features[ind+thisBin+int(n/bin_size)] = 1
     ind += 2*(n/bin_size)+1
 
-    # distances
-    #features[ind] = abs(event_t_id - timex_t_id)
-    #ind += 1
-    #if event_t_id - timex_t_id > 0:
-    #    features[ind] = event_t_id - timex_t_id
-    #ind += 1
-    #if timex_t_id - event_t_id > 0:
-    #    features[ind] = timex_t_id - event_t_id
-    #ind += 1
     
     # if mentioned before the event
     if timex_t_id < event_t_id:
         features[ind] = 1
     ind += 1
 
-    '''
-    # check how many timex between this timex and event
-    wanted_type = ['DATE', 'TIME']
-    locTimex = []
-    for t in doc.Markables.TIMEX3:
-        if wanted_type.count(t.get_type()):
-            locTimex.append(t.get_token_anchor()[0].t_id)
-    #print timex_t_id, event_t_id, locTimex
-    locTimex.append(event_t_id)
-    locTimex.sort()
-    timexIndex = locTimex.index(timex_t_id)
-    eventIndex = locTimex.index(event_t_id)
-    d = eventIndex - timexIndex
-    d = d if d < 50 else 50
-    d = d if d > -50 else -50
-    features[d+50] = 1
-    ind += 101
-    #print locTimex, d
-    '''
     # syntactic features
     if event_sentence == timex_sentence:
         wanted_sentence = event_sentence
@@ -446,25 +420,6 @@ def getLocalFeatures(doc, event, timex_m_id, syntactic_features):
                         #print  dep[1].text, dep[0].text, ':' + syntactic_features[i], event_sentence, doc.get_doc_id()
                         features[ind+i] = 1
     ind += len(syntactic_features)
-    '''
-    # check if other events with the same text are linked to this timex via syntactic features
-    for other_event in doc.Markables.EVENT_MENTION:
-        if other_event.m_id == event.m_id:
-            continue
-        other_event_t_id = other_event.get_token_anchor()[0].t_id
-        other_event_sentence = utils.getToken(doc, other_event_t_id).sentence    
-        other_event_text = utils.getEventTextFull(doc, other_event)
-        if other_event_text == event_text and other_event_sentence == timex_sentence:
-            wanted_sentence = other_event_sentence
-            deps = doc.root[0][0][wanted_sentence][2] # NB: note the indexing! The title is a separate sentence in CAT but it's merged into 1st sentence in Stanford NLP parse.
-
-            for dep in deps:
-                if other_event_text.split('_').count(dep[0].text.lower()) and timex_text.split(' ').count(dep[1].text):
-                    for i in range(0, len(syntactic_features)):
-                        if dep.values()[0] == syntactic_features[i]:
-                            #print  dep[1].text, dep[0].text, ':' + syntactic_features[i], other_event_sentence, doc.get_doc_id()
-                            features[ind+i] = 1
-    '''
 
     # check if date is in the future
     this_date = utils.str2date(utils.getTIMEX3Stamp(doc, timex_m_id))

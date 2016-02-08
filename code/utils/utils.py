@@ -12,8 +12,8 @@ def loadDocs(inDir):
     
     collection = list()
     for f in files:
-        with suppress_stdout_stderr():
-            d = cat_parser.parse(f)
+        #with suppress_stdout_stderr():
+        d = cat_parser.parse(f, silence=True)
         if len(d.Markables.TIMEX3) == 1: # TBD:hacky
             d.Markables.set_DCT(d.Markables.TIMEX3[0])
         collection.append(d)    
@@ -316,19 +316,21 @@ def goldTimelineList(targetEntityList, goldTimelineDir):
         fname = targetEntity.lower().replace(' ', '_')
         fname = fname.replace('&', '_and_')
         fname = goldTimelineDir + '/' + fname + '.txt'
-        lines = [line.rstrip('\n') for line in open(fname, 'r')]
-        for i in range(1, len(lines)): # skip 1st line
-            tmp = lines[i].split('\t') # split on tabs
-            tmpOrder = int(tmp[0])
-            tmpDate = tmp[1]
-            tmpList = tmp[2:] # get the '17677-2-leave	17677-4-leave	18315-11-leave' bit in a list
-            for tmp in tmpList:
-                tmp = tmp.split('-')
-                docId = int(tmp[0])
-                sen = int(tmp[1])
-                #event = tmp[2]
-                event = '-'.join(tmp[2:]) # deal with events like 'out-sold'
-                res.append((docId, sen, event, targetEntity, tmpDate, tmpOrder))
+        
+        with open(fname, 'r') as f:
+            lines = [line.rstrip('\n') for line in f.readlines()]
+            for i in range(1, len(lines)): # skip 1st line
+                tmp = lines[i].split('\t') # split on tabs
+                tmpOrder = int(tmp[0])
+                tmpDate = tmp[1]
+                tmpList = tmp[2:] # get the '17677-2-leave	17677-4-leave	18315-11-leave' bit in a list
+                for tmp in tmpList:
+                    tmp = tmp.split('-')
+                    docId = int(tmp[0])
+                    sen = int(tmp[1])
+                    #event = tmp[2]
+                    event = '-'.join(tmp[2:]) # deal with events like 'out-sold'
+                    res.append((docId, sen, event, targetEntity, tmpDate, tmpOrder))
     return res
 
 def annotateCollectionWithGoldTimeline(collection, targetEntityList, goldTimelineDir):

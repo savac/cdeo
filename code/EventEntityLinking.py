@@ -9,8 +9,6 @@ import copy
 import cdeo_config
 import itertools
 import nltk.stem.porter as porter
-#from viterbi import hmmClass
-#from viterbi import Viterbi
 import viterbi
 reload(viterbi)
 reload(utils)
@@ -65,8 +63,11 @@ def predictEventEntityLink(clf, doc, event, targetEntityList, syntactic_features
             features += [thisEntityFeatures]
             labels += [targetEntity]
             
-    prediction = clf.predict(features)
-    return [labels[i] for i, x in enumerate(prediction) if x]
+    if len(features):
+        prediction = clf.predict(features)
+        return [labels[i] for i, x in enumerate(prediction) if x]
+    else:
+        return ['unknown']
             
     '''
         # legacy maxent code
@@ -109,21 +110,6 @@ def trainEventEntityClassifier(collection_train_list, syntactic_features):
                             labelsList += [1]
                         else:                                            # false label
                             labelsList += [0]
-
-    '''
-    decision_function(X)	Predict confidence scores for samples.
-    densify()	Convert coefficient matrix to dense array format.
-    fit(X, y)	Fit the model according to the given training data.
-    fit_transform(X[, y])	Fit to data, then transform it.
-    get_params([deep])	Get parameters for this estimator.
-    predict(X)	Predict class labels for samples in X.
-    predict_log_proba(X)	Log of probability estimates.
-    predict_proba(X)	Probability estimates.
-    score(X, y[, sample_weight])	Returns the mean accuracy on the given test data and labels.
-    set_params(**params)	Set the parameters of this estimator.
-    sparsify()	Convert coefficient matrix to sparse format.
-    transform(X[, threshold])	Reduce X to its most important features.
-    '''
 
     # solver : {'newton-cg', 'lbfgs', 'liblinear'}
     #clf = LogisticRegression(solver='lbfgs', C=0.5, penalty='l2', tol=1e-5, class_weight='auto', fit_intercept=True)
@@ -338,17 +324,6 @@ def getLocalFeatures(doc, event, targetEntity, syntactic_features):
             entity_text = utils.getEntityText(doc, en)
             
             if entity_sentence == event_sentence: # only consider target entities in the same sentence
-                # sum of mentions in the document
-                #d = np.sum([1 for x in doc.Markables.ENTITY_MENTION if x.get_type() == targetEntity])
-                #features[ind] = d
-                #ind += 1
-                #n = 20
-                #bin_size = 1.0
-                #if abs(d) <= n:
-                #    thisBin = int(np.fix(d/bin_size))
-                #    features[ind+thisBin] = 1
-                #ind += (n/bin_size)  # 20
-
                 # bins of 1 unit token distance
                 d = event_t_id - entity_t_id
                 n = 20
@@ -399,10 +374,6 @@ def getLocalFeatures(doc, event, targetEntity, syntactic_features):
                                     features[ind+i] = 1  
                 #ind += len(syntactic_features)
     
-    #if np.sum(features) > 0 :
-    #    return features
-    #else:
-    #    return None
     return features
 
 def getGlobalFeatures(doc, t0, t1):
@@ -427,18 +398,18 @@ def getGlobalFeatures(doc, t0, t1):
 
     ind = 0
 
-    #if entity0 == entity1:
-    #    features[ind] = 1
-    #ind += 1
+    if entity0 == entity1:
+        features[ind] = 1
+    ind += 1
 
-    #if not entity0 == entity1:
-    #    features[ind] = 1
-    #ind += 1
+    if not entity0 == entity1:
+        features[ind] = 1
+    ind += 1
     
     # event string
-    #if entity0 == entity1 and str_event0 == str_event1:
-    #    features[ind] = 1
-    #ind += 1
+    if entity0 == entity1 and str_event0 == str_event1:
+        features[ind] = 1
+    ind += 1
 
     # event stem
     if entity0 == entity1 and stem0 == stem1:
