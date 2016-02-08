@@ -2,6 +2,7 @@ import utils.cat_parser as cat_parser
 import utils.utils as utils
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
+from sklearn.linear_model import Perceptron
 import numpy as np
 import random
 import copy
@@ -53,7 +54,42 @@ def linkEventEntityML(clf, doc, targetEntityList, syntactic_features):
             if targetEntityList.count(predictedEntity): # check if the predicted entity is not 'unknown'
                 res[predictedEntity].append(event.m_id)
     return res
-    
+
+def predictEventEntityLink(clf, doc, event, targetEntityList, syntactic_features):
+    '''Given a trained classifier predict the Entity associated with the Event'''
+    features = list()
+    labels = list()
+    for targetEntity in targetEntityList:
+        thisEntityFeatures = getLocalFeatures(doc, event, targetEntity, syntactic_features)
+        if np.sum(thisEntityFeatures)>0:
+            features += [thisEntityFeatures]
+            labels += [targetEntity]
+            
+    prediction = clf.predict(features)
+    return [labels[i] for i, x in enumerate(prediction) if x]
+            
+    '''
+        # legacy maxent code
+        predicted_prob = clf.predict_proba(features)
+        predicted_prob = [x[1] for x in predicted_prob] # get the '1' label in the 2nd column
+        imax = np.argmax(predicted_prob)
+        #print predicted_prob, labels
+        isorted = list(reversed(utils.myargsort(predicted_prob)))
+        imax = isorted[0]
+            
+        if predicted_prob[imax] > cdeo_config.getConfig('event_entity_link_threshold'): # increase to increase precision at the cost of recall
+            res = [labels[imax]]
+        else:
+            return ['unknown']
+        
+        # if we have another entity label with a high probability of a link (it could be a conjunction)
+        #if len(predicted_prob) > 1:
+        #    i2nd = isorted[1]
+        #    if predicted_prob[i2nd] >= 0.5:
+        #        res.append(labels[i2nd])
+        return res
+    '''
+
 def trainEventEntityClassifier(collection_train_list, syntactic_features):
     '''Takes a collection that has been annotated with the gold timeline and a list of target entities. 
     Returns a collection of documents with the EVENT elements annotated with the gold Entity. Returns a classifier for the event-entity links.'''
@@ -90,7 +126,8 @@ def trainEventEntityClassifier(collection_train_list, syntactic_features):
     '''
 
     # solver : {'newton-cg', 'lbfgs', 'liblinear'}
-    clf = LogisticRegression(solver='lbfgs', C=0.5, penalty='l2', tol=1e-5, class_weight='auto', fit_intercept=True)
+    #clf = LogisticRegression(solver='lbfgs', C=0.5, penalty='l2', tol=1e-5, class_weight='auto', fit_intercept=True)
+    clf = Perceptron(penalty=None, alpha=0.0001, fit_intercept=True, n_iter=5, shuffle=True, verbose=0, eta0=1.0, n_jobs=1, random_state=0, class_weight=None, warm_start=False)
     #clf = LogisticRegression(solver='liblinear', C=0.5, penalty='l2', tol=1e-5, class_weight='auto', fit_intercept=True)
     #clf = SVC(probability=True, kernel='rbf', class_weight='auto', tol=1e-4)
     print '#'
@@ -101,37 +138,6 @@ def trainEventEntityClassifier(collection_train_list, syntactic_features):
     print len(featuresList), np.sum(labelsList)
 
     return clf
-    
-def predictEventEntityLink(clf, doc, event, targetEntityList, syntactic_features):
-    '''Given a trained classifier predict the Entity associated with the Event'''
-    features = list()
-    labels = list()
-    for targetEntity in targetEntityList:
-        thisEntityFeatures = getLocalFeatures(doc, event, targetEntity, syntactic_features)
-        if np.sum(thisEntityFeatures)>0:
-            features += [thisEntityFeatures]
-            labels += [targetEntity]
-    if len(features) > 0:
-        predicted_prob = clf.predict_proba(features)
-        predicted_prob = [x[1] for x in predicted_prob] # get the '1' label in the 2nd column
-        imax = np.argmax(predicted_prob)
-        #print predicted_prob, labels
-        isorted = list(reversed(utils.myargsort(predicted_prob)))
-        imax = isorted[0]
-            
-        if predicted_prob[imax] > cdeo_config.getConfig('event_entity_link_threshold'): # increase to increase precision at the cost of recall
-            res = [labels[imax]]
-        else:
-            return ['unknown']
-        
-        # if we have another entity label with a high probability of a link (it could be a conjunction)
-        #if len(predicted_prob) > 1:
-        #    i2nd = isorted[1]
-        #    if predicted_prob[i2nd] >= 0.5:
-        #        res.append(labels[i2nd])
-        return res
-    else:
-        return ['unknown'] # we could not exctract any features
     
 def extractSyntacticFeatures(collection):
     res = list()
@@ -419,25 +425,27 @@ def getGlobalFeatures(doc, t0, t1):
     stem0 = stemmer.stem(str_event0.split('_')[0])
     stem1 = stemmer.stem(str_event1.split('_')[0])
 
-    if entity0 == entity1:
-        features[0] = 1
-    ind = 1
+    ind = 0
 
-    if not entity0 == entity1:
-        features[ind] = 1
-    ind += 1
+    #if entity0 == entity1:
+    #    features[ind] = 1
+    #ind += 1
+
+    #if not entity0 == entity1:
+    #    features[ind] = 1
+    #ind += 1
     
     # event string
-    if entity0 == entity1 and str_event0 == str_event1:
-        features[ind] = 1
-    ind += 1
+    #if entity0 == entity1 and str_event0 == str_event1:
+    #    features[ind] = 1
+    #ind += 1
 
     # event stem
     if entity0 == entity1 and stem0 == stem1:
         features[ind] = 1
     ind += 1
 
-    # sentence
+    ## sentence
     if entity0 == entity1 and event_sentence0 == event_sentence1:
         features[ind] = 1
     ind += 1

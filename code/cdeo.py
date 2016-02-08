@@ -180,14 +180,14 @@ def run(test_corpus_list = [1], train_corpus_list = [0], ee_link_model='seq', et
         timex_syntactic_features += EventTIMEX3Linking.extractSyntacticFeatures(collection_train)
 
     # Train the link classifiers
-    if ee_link_model == 'maxent':
+    if ee_link_model == 'perceptron':
         clfEntity = EventEntityLinking.trainEventEntityClassifier(collection_train_list, entity_syntactic_features)  
-    elif ee_link_model == 'seq':
+    elif ee_link_model == 'structured_perceptron':
         w_ee = EventEntityLinking.structuredPredictionTraining(collection_train_list, entity_syntactic_features)   
         
-    if et_link_model == 'maxent':
+    if et_link_model == 'perceptron':
         clfTIMEX3 = EventTIMEX3Linking.trainEventTIMEX3Classifier(collection_train_list, timex_syntactic_features)
-    elif et_link_model == 'seq':
+    elif et_link_model == 'structured_perceptron':
         w = EventTIMEX3Linking.structuredPredictionTraining(collection_train_list, timex_syntactic_features)
 
     #print w_ee
@@ -204,9 +204,9 @@ def run(test_corpus_list = [1], train_corpus_list = [0], ee_link_model='seq', et
         # Keys are target entities.
         # Values are lists of tuples (doc_id, event_m_id, timex3_m_id, date)
         for doc in collection:
-            if ee_link_model == 'maxent':
+            if ee_link_model == 'perceptron':
                 dictEventEntity = EventEntityLinking.linkEventEntityML(clfEntity, doc, targetEntityList, entity_syntactic_features)
-            elif ee_link_model == 'seq':
+            elif ee_link_model == 'structured_perceptron':
                 dictEventEntity = EventEntityLinking.linkEventEntitySP(w_ee, doc, targetEntityList, entity_syntactic_features)
             for targetEntity in targetEntityList:
                 # legacy role based
@@ -215,9 +215,9 @@ def run(test_corpus_list = [1], train_corpus_list = [0], ee_link_model='seq', et
 
                 listEventEntity = dictEventEntity[targetEntity]
                 
-                if et_link_model == 'maxent':
+                if et_link_model == 'perceptron':
                     listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3ML(clfTIMEX3, doc, listEventEntity, timex_syntactic_features)
-                elif et_link_model == 'seq':
+                elif et_link_model == 'structured_perceptron':
                     listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3SP(w, doc, listEventEntity, timex_syntactic_features)
                 
                 if not timeline.has_key(targetEntity):
