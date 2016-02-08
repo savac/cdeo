@@ -21,13 +21,13 @@ It needs to run from the code/ directory
 
 ```python -c "import cdeo; cdeo.startUWTimeServer()"```
 
-To train on the Apple corpus (corpus 0) and test on the Airbus (corpus 1), GM (corpus 2) and Stock Markets (corpus 3) corpora run
+To train on the Apple corpus (corpus 0) and test on the Airbus (corpus 1), GM (corpus 2) and Stock Markets (corpus 3) using the structured perceptron algorithm run:
 
-```python -c "import cdeo; cdeo.run(test_corpus_list=[1,2,3], train_corpus_list=[0])"```
+```python -c "import cdeo; cdeo.run(test_corpus_list=[1,2,3], train_corpus_list=[0], link_model='structured_perceptron')"```
 
-To use the MaxEnt model for the Event to Entity linking run
+To use the perceptron algorithm run:
 
-```cdeo.run(test_corpus_list=[1,2,3], train_corpus_list=[0], ee_link_model='maxent', et_link_model='seq')```
+```python -c "import cdeo; cdeo.run(test_corpus_list=[1,2,3], train_corpus_list=[0], link_model='perceptron')"```
 
 ##### Results
 |  | Airbus|GM|Stock|  |Total|  |
