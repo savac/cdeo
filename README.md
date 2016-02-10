@@ -38,5 +38,5 @@ To use the perceptron algorithm run:
 |HeidelToul_1|19.6|7.3|20.4|20.1|14.8|17.0|
 |HeidelToul_2|16.5|10.9|25.9|13.6|28.2|18.3|
 |Thesis|25.5|25.8|36.6|29.8|28.2| 28.7|
-|Paper [Event-Entity (MaxEnt), Event-Time (SP)]|26.3|25.4|37.3|?|?|?|
-|Paper [Event-Entity (SP), Event-Time (SP)]|27.8|24.2|29.9|?|?|?|
+|Paper [Event-Entity (Perceptron), Event-Time (Perceptron)]|21.3|22.3|32.3|?|?|?|
+|Paper [Event-Entity (SP), Event-Time (SP)]|25.7|26.6|32.4|?|?|?|
