@@ -164,7 +164,7 @@ def structuredPredictionTraining(collection_train_list, syntactic_features):
     print "Training Event to Entity linking model ..."
     for i in range(15): # number of iterations
         print 'Structured Perceptron Iteration: ', i
-        lrate = 0.95*lrate
+        lrate = 0.8*lrate
         # do the prep
         for tup in collection_train_list:
             (collection, targetEntityList) = tup
@@ -398,18 +398,18 @@ def getGlobalFeatures(doc, t0, t1):
 
     ind = 0
 
-    if entity0 == entity1:
-        features[ind] = 1
-    ind += 1
+    #if entity0 == entity1:
+    #    features[ind] = 1
+    #ind += 1
 
-    if not entity0 == entity1:
-        features[ind] = 1
-    ind += 1
+    #if not entity0 == entity1:
+    #    features[ind] = 1
+    #ind += 1
     
     # event string
-    if entity0 == entity1 and str_event0 == str_event1:
-        features[ind] = 1
-    ind += 1
+    #if entity0 == entity1 and str_event0 == str_event1:
+    #    features[ind] = 1
+    #ind += 1
 
     # event stem
     if entity0 == entity1 and stem0 == stem1:
