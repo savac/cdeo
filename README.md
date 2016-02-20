@@ -29,6 +29,11 @@ To use the perceptron algorithm run:
 
 ```python -c "import cdeo; cdeo.run(test_corpus_list=[1,2,3], train_corpus_list=[0], link_model='perceptron')"```
 
+To run cross-validation (hold out one target entity, train on the rest, predict the timeline for the held out entity):
+
+```python -c "import cdeo; cdeo.crossval(train_corpus=0, link_model='structured_perceptron')"```
+
+
 ##### Results
 |  | Airbus|GM|Stock|  |Total|  |
 | --- | --- | --- | --- | --- | --- | --- |
