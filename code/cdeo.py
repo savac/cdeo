@@ -150,51 +150,10 @@ def evaluateEventTIMEX3Linking(timeline, corpus, collection):
     print len(goldList), len(totalList)
     sys.stdout.write(('%-30s\t%3.9f\t%3.9f\t%3.9f\n' %('Total', recall, precision, f1) )) 
 
-
-def run(test_corpus_list = [1], train_corpus_list = [0], link_model='seq'):
-    ''' 
-    Inputs 
-    test_corpus_list - list of index numbers for the test corpora ( Apple corpus (corpus 0) and test on the Airbus (corpus 1), GM (corpus 2) and Stock Markets (corpus 3) )
-    train_corpus_list - as above for training
-    ee_link_model - Event to Entity linking model type. valid options are 'maxent' (MaxEnt model) and 'seq' (Sequence model)
-    et_link_model - Event to Timestamp
-    This scripts runs all the steps of timeline extraction:
-    1. Extract timestamps
-    2. Extract target entities
-    3. Link events to target entities
-    4. Link events and timestamps
-    5. Order
-    '''
-
-    # Read in the training corpus 
-    collection_train_list = list()
-    entity_syntactic_features = list()
-    timex_syntactic_features = list()
-    for train_corpus in train_corpus_list:
-        (collection_train, targetEntityList_train) = getCollection(train_corpus)
-        goldTimelineDir = '../data/evaluation/corpus_%s/TimeLines_Gold_Standard' %(train_corpus) # TBD: clean this up
-        utils.annotateCollectionWithGoldTimeline(collection_train, targetEntityList_train, goldTimelineDir)
-        collection_train_list.append((collection_train, targetEntityList_train))
-        
-        entity_syntactic_features += EventEntityLinking.extractSyntacticFeatures(collection_train)
-        timex_syntactic_features += EventTIMEX3Linking.extractSyntacticFeatures(collection_train)
-
-    # Train the link classifiers
-    if link_model == 'perceptron':
-        clfEntity = EventEntityLinking.trainEventEntityClassifier(collection_train_list, entity_syntactic_features)  
-    elif link_model == 'structured_perceptron':
-        w_ee = EventEntityLinking.structuredPredictionTraining(collection_train_list, entity_syntactic_features)   
-        
-    if link_model == 'perceptron':
-        clfTIMEX3 = EventTIMEX3Linking.trainEventTIMEX3Classifier(collection_train_list, timex_syntactic_features)
-    elif link_model == 'structured_perceptron':
-        w = EventTIMEX3Linking.structuredPredictionTraining(collection_train_list, timex_syntactic_features)
-
-    #print w_ee
-    #print w
-
-    # Read in, predict and evaluate the test corpus
+def build_timeline(test_corpus_list, model_params):
+    '''Read in, predict and evaluate the test corpus'''
     # TBD: refactor
+    res = []
     for corpus in test_corpus_list:
         (collection, targetEntityList) = getCollection(corpus)
         resDir = '../data/evaluation/corpus_%s/results/' %(corpus)
@@ -204,10 +163,10 @@ def run(test_corpus_list = [1], train_corpus_list = [0], link_model='seq'):
         # Keys are target entities.
         # Values are lists of tuples (doc_id, event_m_id, timex3_m_id, date)
         for doc in collection:
-            if link_model == 'perceptron':
-                dictEventEntity = EventEntityLinking.linkEventEntityML(clfEntity, doc, targetEntityList, entity_syntactic_features)
-            elif link_model == 'structured_perceptron':
-                dictEventEntity = EventEntityLinking.linkEventEntitySP(w_ee, doc, targetEntityList, entity_syntactic_features)
+            if model_params.link_model == 'perceptron':
+                dictEventEntity = EventEntityLinking.linkEventEntityML(model_params.clfEntity, doc, targetEntityList, model_params.entity_syntactic_features)
+            elif model_params.link_model == 'structured_perceptron':
+                dictEventEntity = EventEntityLinking.linkEventEntitySP(model_params.w_ee, doc, targetEntityList, model_params.entity_syntactic_features)
             for targetEntity in targetEntityList:
                 # legacy role based
                 #listEventEntity = EventEntityLinking.linkEventEntityRuleBased(doc, targetEntity) # returns list of event m_id's
@@ -215,10 +174,10 @@ def run(test_corpus_list = [1], train_corpus_list = [0], link_model='seq'):
 
                 listEventEntity = dictEventEntity[targetEntity]
                 
-                if link_model == 'perceptron':
-                    listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3ML(clfTIMEX3, doc, listEventEntity, timex_syntactic_features)
-                elif link_model == 'structured_perceptron':
-                    listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3SP(w, doc, listEventEntity, timex_syntactic_features)
+                if model_params.link_model == 'perceptron':
+                    listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3ML(model_params.clfTIMEX3, doc, listEventEntity, model_params.timex_syntactic_features)
+                elif model_params.link_model == 'structured_perceptron':
+                    listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3SP(model_params.w, doc, listEventEntity, model_params.timex_syntactic_features)
                 
                 if not timeline.has_key(targetEntity):
                     timeline[targetEntity] = list()
@@ -268,8 +227,60 @@ def run(test_corpus_list = [1], train_corpus_list = [0], link_model='seq'):
                 last_eventClusterId = eventClusterId
                 last_stem = this_stem
             f.close()
+        res += [(timeline, corpus, collection)]
+    return res
 
-        # Evaluation
+
+def run(test_corpus_list = [1], train_corpus_list = [0], link_model='structured_perceptron'):
+    ''' 
+    Inputs 
+    test_corpus_list - list of index numbers for the test corpora ( Apple corpus (corpus 0) and test on the Airbus (corpus 1), GM (corpus 2) and Stock Markets (corpus 3) )
+    train_corpus_list - as above for training
+    ee_link_model - Event to Entity linking model type. valid options are 'maxent' (MaxEnt model) and 'seq' (Sequence model)
+    et_link_model - Event to Timestamp
+    This scripts runs all the steps of timeline extraction:
+    1. Extract timestamps
+    2. Extract target entities
+    3. Link events to target entities
+    4. Link events and timestamps
+    5. Order
+    '''
+    model_params = ModelParams(link_model)
+    print cdeo_config.getConfig('restrict_entity_linking_to_sentence_flag')
+
+    # Read in the training corpus, build the dataset from the gold timeline and get syntactic features
+    collection_train_list = list()
+    entity_syntactic_features = list()
+    timex_syntactic_features = list()
+    for train_corpus in train_corpus_list:
+        (collection_train, targetEntityList_train) = getCollection(train_corpus)
+        
+        goldTimelineDir = '../data/evaluation/corpus_%s/TimeLines_Gold_Standard' %(train_corpus) # TBD: clean this up
+        utils.annotateCollectionWithGoldTimeline(collection_train, targetEntityList_train, goldTimelineDir)
+        collection_train_list.append((collection_train, targetEntityList_train))
+        
+        entity_syntactic_features += EventEntityLinking.extractSyntacticFeatures(collection_train)
+        timex_syntactic_features += EventTIMEX3Linking.extractSyntacticFeatures(collection_train)
+    model_params.entity_syntactic_features = entity_syntactic_features
+    model_params.timex_syntactic_features = timex_syntactic_features
+
+    # Training
+    if model_params.link_model == 'perceptron':
+        model_params.clfEntity = EventEntityLinking.trainEventEntityClassifier(collection_train_list, entity_syntactic_features)
+        model_params.clfTIMEX3 = EventTIMEX3Linking.trainEventTIMEX3Classifier(collection_train_list, timex_syntactic_features)
+
+    elif model_params.link_model == 'structured_perceptron':
+        model_params.w_ee = EventEntityLinking.structuredPredictionTraining(collection_train_list, entity_syntactic_features)
+        model_params.w = EventTIMEX3Linking.structuredPredictionTraining(collection_train_list, timex_syntactic_features)
+
+    # Prediction
+    timelines_result = build_timeline(test_corpus_list, model_params)
+
+    # Evaluation
+    for timeline, corpus, collection in timelines_result:
+        print '\n=============================================================='
+        print 'Evaluating corpus %d...' %(corpus)
+        print '=============================================================='
         evaluateEventEntityLinking(timeline, corpus, collection)
         evaluateEventTIMEX3Linking(timeline, corpus, collection)
         try:
@@ -280,3 +291,7 @@ def run(test_corpus_list = [1], train_corpus_list = [0], link_model='seq'):
             os.chdir('..')
         except:
             print 'Evaluation error'
+
+class ModelParams():
+    def __init__(self, link_model):
+        self.link_model = link_model

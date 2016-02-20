@@ -335,7 +335,6 @@ def goldTimelineList(targetEntityList, goldTimelineDir):
 
 def annotateCollectionWithGoldTimeline(collection, targetEntityList, goldTimelineDir):
     linksGold = goldTimelineList(targetEntityList, goldTimelineDir)
-    #print linksGold
     
     # annotate event entries in docs
     for doc in collection:

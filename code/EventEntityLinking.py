@@ -279,7 +279,6 @@ def linkEventEntitySP(w, doc, targetEntityList, syntactic_features):
 
 def argmaxEventEntity(doc, linkedEvents, targetEntityList, w, local_feat_dict, global_feat_dict):
     '''Find the argmax'''
-    
     if cdeo_config.getConfig('restrict_entity_linking_to_sentence_flag'):
         listListEntities= []
         for ev in linkedEvents:
@@ -290,7 +289,8 @@ def argmaxEventEntity(doc, linkedEvents, targetEntityList, w, local_feat_dict, g
                 entity_t_id = en.get_token_anchor()[0].t_id
                 entity_sentence = utils.getToken(doc, entity_t_id).sentence
                 if event_sentence == entity_sentence:
-                    this_list += [en.get_type()]
+                    if en.get_type() in targetEntityList: # check if we are actually trying to predict this entity
+                        this_list += [en.get_type()]
             if len(this_list):
                 this_list = list(set(this_list))
             else:
