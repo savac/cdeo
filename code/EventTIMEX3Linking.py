@@ -10,6 +10,7 @@ from sklearn.svm import SVC
 import itertools
 import nltk.stem.porter as porter
 import viterbi
+import cdeo_config
 reload(viterbi)
 reload(utils)
 
@@ -90,7 +91,8 @@ def trainEventTIMEX3Classifier(collection_train_list, syntactic_features):
                     
     #clf = LogisticRegression(solver='lbfgs', C=0.9, penalty='l2', tol=1e-5, class_weight='auto', fit_intercept=True)
     #clf = LogisticRegression(solver='liblinear', C=1.0, penalty='l1', tol=1e-5, class_weight='auto', fit_intercept=True)
-    clf = Perceptron(penalty=None, alpha=0.0001, fit_intercept=True, n_iter=5, shuffle=True, verbose=0, eta0=1.0, n_jobs=1, random_state=0, class_weight=None, warm_start=False)
+    n_iter = cdeo_config.getConfig('n_epochs_timex')
+    clf = Perceptron(penalty=None, alpha=0.0001, fit_intercept=True, n_iter=n_iter, shuffle=True, verbose=0, eta0=1.0, n_jobs=1, random_state=0, class_weight=None, warm_start=False)
     #clf = SVC(probability=True, kernel='rbf', class_weight='auto', tol=1e-4)
     clf.fit(featuresList, labelsList)
 
@@ -134,24 +136,6 @@ def predictEventTIMEX3Link(clf, doc, event, syntactic_features):
     else:
         return None
             
-    '''
-    predicted_prob = clf.predict_proba(features)
-    predicted_prob = [x[1] for x in predicted_prob] # get the '1' label in the 2nd column
-    imax = np.argmax(predicted_prob)
-
-    if predicted_prob[imax] > 0.1: # increase to increase precision at the cost of recall
-        best_timex = timexList[imax]
-        # deal with future dates wrt to dct: no event should be associated with a future date.
-        this_date = utils.str2date(utils.getTIMEX3Stamp(doc, best_timex))
-        dct_date = utils.str2date(doc.Markables.get_DCT().value)
-
-        if this_date > dct_date:
-            best_timex = doc.Markables.get_DCT().m_id # assing the m_id = 0, which should be the DCT
-        return best_timex
-    else:
-        return None
-    '''
-
 def extractSyntacticFeatures(collection):
     res = list()
     for doc in collection:
@@ -196,14 +180,14 @@ def structuredPredictionTraining(collection_train_list, syntactic_features):
     w = np.zeros(510)
     wa = np.zeros(510)
     c = 1.0
-    lrate = 1
+    #lrate = 1
         
     trainError = list()
     wanted_type = ['DATE','TIME']
     print "Training Event to TIMEX linking model ..."
-    for i in range(0,15): # number of iterations
+    for i in range(cdeo_config.getConfig('n_epochs_timex')): # number of iterations
         print 'Structured Perceptron Iteration: ', i
-        lrate = 0.8*lrate
+        #lrate = cdeo_config.getConfig('lr_decay')*lrate
         # do the prep
         # TBD: speed this up by saving
         for tup in collection_train_list:

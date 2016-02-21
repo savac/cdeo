@@ -69,28 +69,6 @@ def predictEventEntityLink(clf, doc, event, targetEntityList, syntactic_features
     else:
         return ['unknown']
             
-    '''
-        # legacy maxent code
-        predicted_prob = clf.predict_proba(features)
-        predicted_prob = [x[1] for x in predicted_prob] # get the '1' label in the 2nd column
-        imax = np.argmax(predicted_prob)
-        #print predicted_prob, labels
-        isorted = list(reversed(utils.myargsort(predicted_prob)))
-        imax = isorted[0]
-            
-        if predicted_prob[imax] > cdeo_config.getConfig('event_entity_link_threshold'): # increase to increase precision at the cost of recall
-            res = [labels[imax]]
-        else:
-            return ['unknown']
-        
-        # if we have another entity label with a high probability of a link (it could be a conjunction)
-        #if len(predicted_prob) > 1:
-        #    i2nd = isorted[1]
-        #    if predicted_prob[i2nd] >= 0.5:
-        #        res.append(labels[i2nd])
-        return res
-    '''
-
 def trainEventEntityClassifier(collection_train_list, syntactic_features):
     '''Takes a collection that has been annotated with the gold timeline and a list of target entities. 
     Returns a collection of documents with the EVENT elements annotated with the gold Entity. Returns a classifier for the event-entity links.'''
@@ -113,7 +91,8 @@ def trainEventEntityClassifier(collection_train_list, syntactic_features):
 
     # solver : {'newton-cg', 'lbfgs', 'liblinear'}
     #clf = LogisticRegression(solver='lbfgs', C=0.5, penalty='l2', tol=1e-5, class_weight='auto', fit_intercept=True)
-    clf = Perceptron(penalty=None, alpha=0.0001, fit_intercept=True, n_iter=5, shuffle=True, verbose=0, eta0=1.0, n_jobs=1, random_state=0, class_weight=None, warm_start=False)
+    n_iter = cdeo_config.getConfig('n_epochs_entity')
+    clf = Perceptron(penalty=None, alpha=0.0001, fit_intercept=True, n_iter=n_iter, shuffle=True, verbose=0, eta0=1.0, n_jobs=1, random_state=0, class_weight=None, warm_start=False)
     #clf = LogisticRegression(solver='liblinear', C=0.5, penalty='l2', tol=1e-5, class_weight='auto', fit_intercept=True)
     #clf = SVC(probability=True, kernel='rbf', class_weight='auto', tol=1e-4)
     print '#'
@@ -157,14 +136,15 @@ def structuredPredictionTraining(collection_train_list, syntactic_features):
     w = np.zeros(510)
     wa = np.zeros(510)
     c = 1.0
-    lrate = 1
+    #lrate = 1
         
     trainError = list()
     wanted_type = ['DATE','TIME']
     print "Training Event to Entity linking model ..."
-    for i in range(15): # number of iterations
+    for i in range(cdeo_config.getConfig('n_epochs_entity')): # number of iterations
         print 'Structured Perceptron Iteration: ', i
-        lrate = 0.8*lrate
+        #lrate = cdeo_config.getConfig('lr_decay')*lrate
+        #print lrate
         # do the prep
         for tup in collection_train_list:
             (collection, targetEntityList) = tup

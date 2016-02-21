@@ -246,6 +246,7 @@ def run(test_corpus_list = [1], train_corpus_list = [0], link_model='structured_
     4. Link events and timestamps
     5. Order
     '''
+    cdeo_config.setDefaults()
     model_params = ModelParams(link_model)
     print cdeo_config.getConfig('restrict_entity_linking_to_sentence_flag')
 
@@ -351,6 +352,23 @@ def crossval(train_corpus = 0, link_model='structured_perceptron'):
     fmicro, pmicro, rmicro = evaluation_all_function.run(args)
     os.chdir('..')
     return fmicro, pmicro, rmicro
+
+def tuning(link_model='structured_perceptron'):
+    res = []
+    
+    epochs_range = range(5, 30, 5)
+    lr_decay_range = range(5, 30, 5)
+
+    for n_epochs_entity in epochs_range:
+        lr_loop = []
+        for n_epochs_timex in lr_decay_range:
+            cdeo_config.setConfig('n_epochs_entity', n_epochs_entity)
+            cdeo_config.setConfig('n_epochs_timex', n_epochs_timex)
+            # fmicro, pmicro, rmicro
+            lr_loop += [crossval(train_corpus=0, link_model=link_model)]
+        res += [lr_loop]
+    res = np.array(res)
+    return res
 
 class ModelParams():
     def __init__(self, link_model):
