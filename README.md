@@ -34,7 +34,7 @@ To run cross-validation (hold out one target entity, train on the rest, predict 
 
 ```python -c "import cdeo; cdeo.crossval(train_corpus=0, link_model='structured_perceptron')"```
 
-Hyperparamenter tuning for the number of Event-Timex and Event-Entity iterations (you'll need to edit the code to change ranges (both currently [5,10,15,20,25]):
+Hyperparamenter tuning for the number of Event-Timex and Event-Entity iterations. You'll need to edit the code to change ranges (both currently [5,10,15,20,25]):
 
 ```python -c "import cdeo; cdeo.tuning('structured_percetron')"```
 
