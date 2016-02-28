@@ -1,0 +1,12 @@
+Boeing 787 Dreamliner
+1	2005-04	73808-12-illustrates
+2	2005-04-27	8983-14-development
+2	2005-04-27	8983-8-offers
+2	2005-04-27	8983-14-scheduled
+3	2005-06-13	11716-4-purchase
+4	2007-06-10	71526-2-development
+5	2008-05	276079-13-rolling_out
+6	2009-12-15	145930-3-claims
+6	2009-12-15	145930-2-test_flight
+7	2009-12-16	145930-0-flight
+8	2011-08-08	276079-10-arrives

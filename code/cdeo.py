@@ -54,7 +54,6 @@ def getCollection(ncorpus):
     for indoc in collection:
         doc = TimestampExtraction.getTimestamps(indoc) # NB: doc 120578 has a mistake in the DCT annotation. The CAT files has been corrected by hand.
         doc = EntityExtraction.getEntitiesStanfordNLP(doc, targetEntityList)
-        # NB: sort the events in the order that they appear in the text i.e. sort by token position
         oldList = list()
         for event in doc.Markables.EVENT_MENTION:
             event_t_id = event.get_token_anchor()[0].t_id
@@ -78,9 +77,7 @@ def evaluateEventEntityLinking(timeline, corpus, collection):
 
     totalList = list()
     timeList = list()
-    for targetEntity in timeline.keys():
-        # [doc.get_doc_id(), event_m_id, timex3_m_id, this_date, 1, event_sentence, str_event, event_stem]
-        
+    for targetEntity in timeline.keys():        
         thisEntity = list()
         for lst in timeline[targetEntity]:
             [docId, event_m_id, timex3_m_id, this_date, order, event_sentence, str_event, event_stem, eventClusterId] = lst
@@ -171,10 +168,6 @@ def build_timeline(corpus, collection, targetEntityList, model_params):
         elif model_params.link_model == 'structured_perceptron':
             dictEventEntity = EventEntityLinking.linkEventEntitySP(model_params.w_ee, doc, targetEntityList, model_params.entity_syntactic_features)
         for targetEntity in targetEntityList:
-            # legacy role based
-            #listEventEntity = EventEntityLinking.linkEventEntityRuleBased(doc, targetEntity) # returns list of event m_id's
-            #listEventTIMEX3 = EventTIMEX3Linking.linkEventTIMEX3(doc, listEventEntity)
-
             listEventEntity = dictEventEntity[targetEntity]
             
             if model_params.link_model == 'perceptron':
@@ -223,7 +216,7 @@ def build_timeline(corpus, collection, targetEntityList, model_params):
             date_str = utils.getTIMEX3Stamp(doc, timex3_m_id)
 
             # docid-sentence, event, timex3, timex3 text
-            if eventClusterId == last_eventClusterId: # TBD: this is flaky as we only check events adjacent in timeline
+            if eventClusterId == last_eventClusterId:
                 f.write('\t' + str(doc.doc_id) + '-' + str(nsentence)+ '-' + str_event) #+  "\t('" + str_timex + "')" 
             else:
                 f.write('\n' + str(order) + '\t' + date_str + '\t' + str(doc_id) + '-' + str(nsentence)+ '-' + str_event) #+  "\t('" + str_timex + "')" 
@@ -368,6 +361,7 @@ def tuning(link_model='structured_perceptron'):
             lr_loop += [crossval(train_corpus=0, link_model=link_model)]
         res += [lr_loop]
     res = np.array(res)
+    print res
     return res
 
 class ModelParams():

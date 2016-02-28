@@ -1,0 +1,7 @@
+General Motors creditors
+1	2009-06-01	127226-2-filed
+1	2009-06-01	127226-2-protection
+2	2009-06-04	127248-2-called
+2	2009-06-04	127248-2-filed
+2	2009-06-04	127248-2-outlined
+2	2009-06-04	127248-2-protection

@@ -132,7 +132,7 @@ def getTIMEX3(doc, m_id):
         if t.m_id == m_id:
             return t
             
-def getTIMEX3Stamp(doc, m_id): # TBD: this is a mess.
+def getTIMEX3Stamp(doc, m_id):
     if m_id == None:
         return 'XXXX-XX-XX'
     
@@ -218,7 +218,6 @@ def getEntityText(doc, entity):
     return ' '.join(s)
     
 def getToken(doc, t_id):
-    #print doc.get_doc_id(), t_id
     return doc.token[t_id - 1]
     
 def getDoc(collection, doc_id):
@@ -229,9 +228,6 @@ def getDoc(collection, doc_id):
 def str2date(s):
     '''Transform a date in a format such as '2015-01-01' to Python's datetime.date type.
     Account for partial dates. Undefined parts of date will be assigned a value of 1.'''
-    # TBD: these should not be grouped together
-    #11	2009-06	127248-7-emphasized
-    #11	2009-06-01	127227-7-give
     s = s.split('-')
     year = month = day = 1
     try:
@@ -257,13 +253,6 @@ def getNumericTokens(lst):
         if isnum(tok):
             res.append(tok)
     return res
-            
-#def myunique(lst):
-#    '''NB:Order not preserved'''
-#    d = {}
-#    for l in lst:
-#        d[l] = 1
-#    return d.keys()
     
 def myunique(seq):
    # not order preserving
@@ -282,27 +271,6 @@ def removePunctuationList(lst):
         if len(tclean)>0:
             new_lst.append(tclean)
     return new_lst
-        
-def idfScores(collection):
-    '''Given a collection of documents, get a dictionary of idf scores using the classical formula.'''
-    N = len(collection)
-    res = dict()
-    docList = list()
-    for doc in collection:
-        lst = getRawTextList(doc)
-        lst = [tok.lower() for tok in lst]
-        docList.append(lst)
-
-    for lst in docList:
-        for tok in lst:
-            d = 0
-            if not res.has_key(tok):
-                for lst0 in docList:
-                    if lst0.count(tok):
-                        d += 1
-                res[tok] = np.log(float(N)/d)
-                
-    return res
         
 def goldTimelineList(targetEntityList, goldTimelineDir):
     '''Create a list of tuples (doc_it, sentence, event, entity). 
@@ -323,12 +291,11 @@ def goldTimelineList(targetEntityList, goldTimelineDir):
                 tmp = lines[i].split('\t') # split on tabs
                 tmpOrder = int(tmp[0])
                 tmpDate = tmp[1]
-                tmpList = tmp[2:] # get the '17677-2-leave	17677-4-leave	18315-11-leave' bit in a list
+                tmpList = tmp[2:]
                 for tmp in tmpList:
                     tmp = tmp.split('-')
                     docId = int(tmp[0])
                     sen = int(tmp[1])
-                    #event = tmp[2]
                     event = '-'.join(tmp[2:]) # deal with events like 'out-sold'
                     res.append((docId, sen, event, targetEntity, tmpDate, tmpOrder))
     return res
