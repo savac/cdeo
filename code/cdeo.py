@@ -10,6 +10,7 @@ import re
 import copy
 import EntityExtraction
 import TimestampExtraction
+import EventDetection
 import EventEntityLinking
 import EventTIMEX3Linking
 import Ordering
@@ -17,11 +18,12 @@ import nltk.stem.porter as porter
 import cdeo_config
 from evaluation_tool import evaluation_all_function
 reload(evaluation_all_function)
-reload (cdeo_config)
+reload(cdeo_config)
 reload(cat_parser)
 reload(utils)
 reload(EntityExtraction)
 reload(TimestampExtraction)
+reload(EventDetection)
 reload(EventEntityLinking)
 reload(EventTIMEX3Linking)
 reload(Ordering)
@@ -53,7 +55,12 @@ def getCollection(ncorpus):
     
     for indoc in collection:
         doc = TimestampExtraction.getTimestamps(indoc) # NB: doc 120578 has a mistake in the DCT annotation. The CAT files has been corrected by hand.
-        doc = EntityExtraction.getEntitiesStanfordNLP(doc, targetEntityList)
+        doc = EntityExtraction.getEntitiesStanfordNLP(doc, targetEntityList) # TBD: move the Stanford parsing elsewhere
+        
+        if cdeo_config.getConfig('track') == 'A':
+            # detect events using a rule-based approach, NB: this will remove any existing event annotations
+            doc = EventDetection.getEventStanfordNLP(doc)
+        
         oldList = list()
         for event in doc.Markables.EVENT_MENTION:
             event_t_id = event.get_token_anchor()[0].t_id

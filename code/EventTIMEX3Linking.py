@@ -162,7 +162,7 @@ def extractSyntacticFeatures(collection):
             try:
                 deps = doc.root[0][0][wanted_sentence][2] # NB: note the indexing! The title is a separate sentence in CAT but it's merged into 1st sentence in Stanford NLP parse.
             except IndexError:
-                pass
+                pass # TBD: should it not be 'continue' ?
 
             for dep in deps:
                 if event_text.split('_').count(dep[0].text.lower()) and timex_text.split(' ').count(dep[1].text):

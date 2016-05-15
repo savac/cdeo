@@ -12,9 +12,10 @@ def loadDocs(inDir):
     
     collection = list()
     for f in files:
-        #with suppress_stdout_stderr():
         d = cat_parser.parse(f, silence=True)
-        if len(d.Markables.TIMEX3) == 1: # TBD:hacky
+        # there should be just one TIMEX3 tag with the doc creation time
+        # we create an explicit DCT tag
+        if len(d.Markables.TIMEX3) == 1:
             d.Markables.set_DCT(d.Markables.TIMEX3[0])
         collection.append(d)    
     return collection

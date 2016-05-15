@@ -10,7 +10,8 @@ def setDefaults():
     "levenshtein_threshold": 0.4, 
     "event_entity_link_threshold": 0.1, 
     "root_dir": "/home/sc/projects/cdeo/", 
-    "uwtime_loc": "/home/sc/work/uwtime-standalone/target/uwtime-standalone-1.0.1.jar"}
+    "uwtime_loc": "/home/sc/work/uwtime-standalone/target/uwtime-standalone-1.0.1.jar",
+    'track': 'A'}
 
     f = open(config_json_loc, 'w')
     json.dump(defaults, f)
