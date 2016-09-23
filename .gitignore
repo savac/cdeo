@@ -1,3 +1,4 @@
 # exclude files
 *.pyc
 *.Rhistory
+notes/*
