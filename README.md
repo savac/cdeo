@@ -53,3 +53,12 @@ To get the total micro scores place all predicted and gold timelines in two sepa
 |Thesis|25.5|25.8|36.6|29.8|28.2| 28.7|
 |Our_System_Binary|17.99|20.97|34.95|25.97|24.79|25.37|
 |Our_System_Alignment|25.65|26.64|32.35|29.05|28.12|28.58|
+
+##### Data
+The evaluation data was obtained from the TimeLine task at SemEval 2015 (http://alt.qcri.org/semeval2015/task4/). By downloading the Data folder you must accept the Agreement Terms of the CC-BY 3.0 license (Creative Commons Attribution 3.0 Unported License). The CC-BY license is available here: http://creativecommons.org/licenses/by/3.0/
+
+Publication Credit:
+
+The NewsReader 7th FP project will be acknowledged with appropriate citations in any publication or presentation containing research results obtained in whole or in part through the use of the Data. The following publication has to be cited:
+
+Anne-Lyse Minard, Manuela Speranza , Eneko Agirre, Itziar Aldabe, Marieke van Erp, Bernardo Magnini, German Rigau, Ruben Urizar. SemEval-2015 Task 4: TimeLine: Cross-Document Event Ordering. To appear.
